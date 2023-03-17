@@ -100,33 +100,52 @@ classdef DX_XM430_W350
 
         function readings = getJointReadings(self)  
 
+            readings = zeros(1,3);
+
             cur_pos = read4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.CURR_POSITION);
             self.checkPacket();
             cur_vel = read4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.CURR_VELOCITY);
             self.checkPacket();
             cur_curr = read4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.CURR_CURRENT);
             self.checkPacket();
-
-            cur_pos = typecast(uint32(cur_pos), 'int32');
-            cur_vel = typecast(uint32(cur_vel), 'int32');
-            cur_curr = typecast(uint32(cur_curr), 'int32');
+            disp(cur_pos)
+            
+            cur_vel = int32(cur_vel);
+            cur_curr = int32(cur_curr);
 
             cur_pos = (cur_pos - 2048) * 360/4096;
 
-            readings = [cur_pos cur_vel cur_curr];
+            readings(1) = cur_pos;
+            readings(2) = cur_vel;
+            readings(3) = cur_curr;
 
 %             fprintf('[ID:%03d] PresPos:%03d\tPresCur:%03d\tPresVel:%03d\n', self.ID, cur_pos, cur_curr, cur_vel);
         end
 
         function writePosition(self, angle)
-            position = mod(typecast(uint32(angle * 4096/360 + 2048), 'int32'), 4096)
+            position = mod(typecast(uint32(angle * 4096/360 + 2048), 'int32'), 4096);
             write4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.GOAL_POSITION, position);
+            self.checkPacket();
+        end
+
+        function writeVelocity(self, velocityInTicks)
+            write4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.GOAL_VELOCITY, velocityInTicks);
+            self.checkPacket();
+        end
+
+        function writeCurrent(self, currentInTicks)
+            write4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.GOAL_CURRENT, currentInTicks);
             self.checkPacket();
         end
 
         function toggleTorque(self, enable)
             % Enable Dynamixel#1 Torque
             write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.TORQUE_ENABLE, enable);
+            self.checkPacket();
+        end
+
+        function toggleLED(self, enable)
+            write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.LED, enable);
             self.checkPacket();
         end
 
