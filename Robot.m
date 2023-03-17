@@ -7,11 +7,11 @@ classdef Robot
 
     methods
         function readings = getJointsReadings(self)
-
+            
         end
 
         function writeJoints(self, goals)
-
+            
         end
     end
 end

@@ -325,7 +325,8 @@ while 1
         dxl4_present_position = groupBulkReadGetData(groupread_num, DXL4_ID, ADDR_PRO_PRESENT_POSITION, LEN_PRO_PRESENT_POSITION);
         dxl5_present_position = groupBulkReadGetData(groupread_num, DXL5_ID, ADDR_PRO_PRESENT_POSITION, LEN_PRO_PRESENT_POSITION);
         
-        % Convert to ints
+
+        % Printing
         dxl1_present_position = typecast(uint32(dxl1_present_position), 'int32');
         dxl2_present_position = typecast(uint32(dxl2_present_position), 'int32');
         dxl3_present_position = typecast(uint32(dxl3_present_position), 'int32');
@@ -338,10 +339,6 @@ while 1
             DXL3_ID, dxl3_present_position, ...
             DXL4_ID, dxl4_present_position, ...
             DXL5_ID, dxl5_present_position);
-
-%         if ~(abs(dxl_goal_position(index) - dxl1_present_position) > DXL_MOVING_STATUS_THRESHOLD)
-%             break;
-%         end
     end
 
     % Change goal position
