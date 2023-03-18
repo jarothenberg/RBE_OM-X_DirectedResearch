@@ -1,7 +1,6 @@
 % Motor Class for the Dynamixel (X-Series) XM430-W350
-
+% The OpenManipulator-X arm consists of five of these (four joints + gripper)
 classdef DX_XM430_W350
-
     properties
         % Constants
         DEVICENAME;
@@ -27,9 +26,23 @@ classdef DX_XM430_W350
         POS_LEN;
         VEL_LEN;
         CURR_LEN;
+        CURR_CNTR_MD;
+        VEL_CNTR_MD;
+        POS_CNTR_MD;
+        EXT_POS_CNTR_MD;
+        CURR_POS_CNTR_MD;
+        PWM_CNTR_MD;
+
+        % Unit Conversions
+        TICKS_PER_ANGVEL;
+        TICKS_PER_ROT;
+        TICKS_PER_DEG;
+        TICK_POS_OFFSET;
 
         % Variables
         ID; % Dynamixel ID
+        writeMode;
+        % torqueEnable;
     end
 
     methods
@@ -42,7 +55,7 @@ classdef DX_XM430_W350
             self.COMM_TX_FAIL = -1001;
 
             % Load Libraries
-            self.LIB_NAME = 'libdxl_x64_c';
+            self.LIB_NAME = 'libdxl_x64_c'; % Linux 64
             if ~libisloaded(self.LIB_NAME)
                 [notfound, warnings] = loadlibrary(self.LIB_NAME, 'dynamixel_sdk.h', 'addheader', 'port_handler.h', 'addheader', 'packet_handler.h', 'addheader', 'group_bulk_read.h', 'addheader', 'group_bulk_write.h');
             end
@@ -66,8 +79,22 @@ classdef DX_XM430_W350
             self.POS_LEN = 4;
             self.VEL_LEN = 4;
             self.CURR_LEN = 2;
+            self.CURR_CNTR_MD = 0;
+            self.VEL_CNTR_MD = 1;
+            self.POS_CNTR_MD = 3;
+            self.EXT_POS_CNTR_MD = 4;
+            self.CURR_POS_CNTR_MD = 5;
+            self.PWM_CNTR_MD = 16;
+
+            % Unit Conversions
+            self.TICKS_PER_ANGVEL = 0.229 * 6; % 1 tick = 0.229*2 rev/min = 0.229*360/60 deg/s
+            self.TICKS_PER_ROT = 4096;
+            self.TICKS_PER_DEG = self.TICKS_PER_ROT/360;
+            self.TICK_POS_OFFSET = self.TICKS_PER_ROT/2; % position value for a joint angle of 0 (2048 for this case)
 
             self.startConnection();
+            self.writeMode = self.readWriteByte(1, self.OPR_MODE);
+            % self.torqueEnable = logical(read1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.TORQUE_ENABLE));
         end
 
         function startConnection(self)
@@ -99,63 +126,158 @@ classdef DX_XM430_W350
         end
 
         function readings = getJointReadings(self)  
-
             readings = zeros(1,3);
-
-            cur_pos = read4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.CURR_POSITION);
-            self.checkPacket();
-            cur_vel = read4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.CURR_VELOCITY);
-            self.checkPacket();
-            cur_curr = read4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.CURR_CURRENT);
-            self.checkPacket();
-            disp(cur_pos)
             
-            cur_vel = int32(cur_vel);
-            cur_curr = int32(cur_curr);
+            cur_pos = self.readWriteByte(4, self.CURR_POSITION);
+            cur_vel = self.readWriteByte(4, self.CURR_VELOCITY);
+            cur_curr = self.readWriteByte(4, self.CURR_CURRENT);
 
-            cur_pos = (cur_pos - 2048) * 360/4096;
+            % disp(cur_pos)
+            
+            % cur_vel = int32(cur_vel);
+            % cur_curr = int32(cur_curr);
 
+            cur_pos = (cur_pos - self.TICK_POS_OFFSET) / self.TICKS_PER_DEG;
+            cur_vel = cur_vel / self.TICKS_PER_ANGVEL;
+            
             readings(1) = cur_pos;
             readings(2) = cur_vel;
-            readings(3) = cur_curr;
+            % readings(3) = cur_curr;
 
 %             fprintf('[ID:%03d] PresPos:%03d\tPresCur:%03d\tPresVel:%03d\n', self.ID, cur_pos, cur_curr, cur_vel);
         end
 
         function writePosition(self, angle)
-            position = mod(typecast(uint32(angle * 4096/360 + 2048), 'int32'), 4096);
-            write4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.GOAL_POSITION, position);
-            self.checkPacket();
+            % if (self.writeMode ~= self.POS_CNTR_MD)
+            %     error("writePosition called by motor id:%d is not in position control mode.", self.ID)
+            % end
+
+            position = mod(typecast(uint32(angle * self.TICKS_PER_DEG + self.TICK_POS_OFFSET), 'int32'), self.TICKS_PER_ROT);
+            self.readWriteByte(4, self.GOAL_POSITION, position);
         end
 
-        function writeVelocity(self, velocityInTicks)
-            write4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.GOAL_VELOCITY, velocityInTicks);
-            self.checkPacket();
+        function writeVelocity(self, velocity)
+            velTicks = velocity;
+            % 
+            % velTicks = velocity * self.TICKS_PER_ANGVEL; 
+            % disp(velTicks)
+            % velTicks = typecast(int32(velTicks), 'int32');
+            % disp(velTicks)
+            
+            % if (self.writeMode ~= self.VEL_CNTR_MD)
+            %     error("writeVelocity called by motor id:%d is not in velocity control mode.", self.ID)
+            % end
+
+            % write4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.GOAL_VELOCITY, velocityInTicks);
+            % self.checkPacket(self.GOAL_VELOCITY, velocityInTicks);
+            self.readWriteByte(4, self.GOAL_VELOCITY, velTicks);
         end
 
         function writeCurrent(self, currentInTicks)
-            write4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.GOAL_CURRENT, currentInTicks);
-            self.checkPacket();
+            if (self.writeMode ~= self.CURR_CNTR_MD)
+                error("writeCurrent called by motor id:%d is not in current control mode.", self.ID)
+            end
+
+            % write4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.GOAL_CURRENT, currentInTicks);
+            % self.checkPacket(self.GOAL_CURRENT, currentInTicks);
+            self.readWriteByte(4, self.GOAL_CURRENT, currentInTicks);
         end
 
         function toggleTorque(self, enable)
+            % self.torqueEnable = enable;
             % Enable Dynamixel#1 Torque
-            write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.TORQUE_ENABLE, enable);
-            self.checkPacket();
+            % write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.TORQUE_ENABLE, enable);
+            % self.checkPacket(self.TORQUE_ENABLE, enable);
+            self.readWriteByte(1, self.TORQUE_ENABLE, enable);
         end
 
         function toggleLED(self, enable)
-            write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.LED, enable);
-            self.checkPacket();
+            % write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.LED, enable);
+            % self.checkPacket(self.LED, enable);
+            self.readWriteByte(1, self.LED, enable);
         end
 
-        function checkPacket(self)
+        % Change the operating mode:
+        % https://emanual.robotis.com/docs/en/dxl/x/xm430-w350/#operating-mode11
+        % "current": Current Control Mode (writeCurrent)
+        % "velocity": Velocity Control Mode (writeVelocity)
+        % "position": Position Control Mode (writePosition)
+        % "ext position": Extended Position Control Mode
+        % "curr position": Current-based Position Control Mode
+        % "pwm voltage": PWM Control Mode
+        function setOperatingMode(self, mode)
+            % if self.torqueEnable
+            %     error("The motor torque must be disabled before running setOperatingMode.")
+            % end
+            switch mode
+                case {'current', 'c'} 
+                    self.writeMode = self.CURR_CNTR_MD;
+                case {'velocity', 'v'}
+                    self.writeMode = self.VEL_CNTR_MD;
+                case {'position', 'p'}
+                    self.writeMode = self.POS_CNTR_MD;
+                case {'ext position', 'ep'}
+                    self.writeMode = self.EXT_POS_CNTR_MD;
+                case {'curr position', 'cp'}
+                    self.writeMode = self.CURR_POS_CNTR_MD;
+                case {'pwm voltage', 'pwm'}
+                    self.writeMode = self.PWM_CNTR_MD;
+                otherwise
+                    error("setOperatingMode input cannot be '%s'. See implementation in DX_XM430_W350 class.", mode)
+            end
+
+            % write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.OPR_MODE, self.writeMode);
+            % self.checkPacket(self.OPR_MODE, self.writeMode)
+            self.readWriteByte(1, self.OPR_MODE, self.writeMode);
+        end
+
+        function checkPacket(self, addr, msg)
             dxl_comm_result = getLastTxRxResult(self.PORT_NUM, self.PROTOCOL_VERSION);
             dxl_error = getLastRxPacketError(self.PORT_NUM, self.PROTOCOL_VERSION);
+            packetError = (dxl_comm_result ~= self.COMM_SUCCESS) || (dxl_error ~= 0);
+
+            if exist("msg", "var") && packetError
+                fprintf('[msg] %s\n', int32(msg))
+            end
+
             if dxl_comm_result ~= self.COMM_SUCCESS
-                fprintf('%s\n', getTxRxResult(self.PROTOCOL_VERSION, dxl_comm_result));
+                fprintf('[addr:%d] %s\n', addr, getTxRxResult(self.PROTOCOL_VERSION, dxl_comm_result));
+                error("Communication Error: See above.")
             elseif dxl_error ~= 0
-                fprintf('%s\n', getRxPacketError(self.PROTOCOL_VERSION, dxl_error));
+                fprintf('[addr:%d] %s\n', addr, getRxPacketError(self.PROTOCOL_VERSION, dxl_error));
+                error("Recieved Error Packet: See above.")
+            end
+        end
+
+        function byte = readWriteByte(self, n, addr, msg)
+            if exist("msg", "var")
+                switch n
+                    case {1}
+                        write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr, msg);
+
+                    case {2}
+                        write2ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr, msg);
+
+                    case {4}
+                        write4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr, msg);
+                    otherwise
+                        error("'%s' is not a valid number of bytes to write.\n", n);
+                end
+                self.checkPacket(addr, msg);
+            else
+                switch n
+                    case {1}
+                        byte = read1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr);
+
+                    case {2}
+                        byte = read2ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr);
+
+                    case {4}
+                        byte = read4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr);
+                    otherwise
+                        error("'%s' is not a valid number of bytes to read.\n", n);
+                end
+                self.checkPacket(addr);
             end
         end
     end

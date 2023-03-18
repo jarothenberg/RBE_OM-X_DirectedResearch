@@ -12,8 +12,16 @@ classdef Robot
             motorsNum = 4;
             motorIDs = [11, 12, 13, 14];
             gripperID = 15;
-            devices = serialportlist();
-            deviceName = convertStringsToChars(devices(1));
+
+            try
+                devices = serialportlist();
+                deviceName = convertStringsToChars(devices(1));
+            catch exception
+                error("Failed to connect via serial, no devices found.")
+            end
+            % Find serial port and connect to it
+            
+
             for i=1:motorsNum
                 self.motors = [self.motors; DX_XM430_W350(motorIDs(i), deviceName)];
             end
