@@ -130,7 +130,7 @@ classdef DX_XM430_W350
             
             cur_pos = self.readWriteByte(4, self.CURR_POSITION);
             cur_vel = self.readWriteByte(4, self.CURR_VELOCITY);
-            cur_curr = self.readWriteByte(4, self.CURR_CURRENT);
+            cur_curr = self.readWriteByte(2, self.CURR_CURRENT);
 
             % disp(cur_pos)
             
@@ -161,8 +161,8 @@ classdef DX_XM430_W350
             % 
             % velTicks = velocity * self.TICKS_PER_ANGVEL; 
             % disp(velTicks)
-            % velTicks = typecast(int32(velTicks), 'int32');
-            % disp(velTicks)
+            % velTicks = typecast(uint32(velTicks), 'int32');
+            disp(velTicks)
             
             % if (self.writeMode ~= self.VEL_CNTR_MD)
             %     error("writeVelocity called by motor id:%d is not in velocity control mode.", self.ID)
@@ -178,9 +178,9 @@ classdef DX_XM430_W350
                 error("writeCurrent called by motor id:%d is not in current control mode.", self.ID)
             end
 
-            % write4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.GOAL_CURRENT, currentInTicks);
+            % write2ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.GOAL_CURRENT, currentInTicks);
             % self.checkPacket(self.GOAL_CURRENT, currentInTicks);
-            self.readWriteByte(4, self.GOAL_CURRENT, currentInTicks);
+            self.readWriteByte(2, self.GOAL_CURRENT, currentInTicks);
         end
 
         function toggleTorque(self, enable)
@@ -250,15 +250,26 @@ classdef DX_XM430_W350
         end
 
         function byte = readWriteByte(self, n, addr, msg)
+            
             if exist("msg", "var")
+                
                 switch n
                     case {1}
+                        if msg < 0 % Convert to 2s complement 32 bit int because MATLAB is stupid
+                            msg = 0xff + msg + 1;
+                        end
                         write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr, msg);
-
                     case {2}
+                        if msg < 0 % Convert to 2s complement 32 bit int because MATLAB is stupid
+                            msg = 0xffff + msg + 1;
+                        end
                         write2ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr, msg);
-
                     case {4}
+                        disp(msg)
+                        if msg < 0 % Convert to 2s complement 32 bit int because MATLAB is stupid
+                            msg = 0xffffffff + msg + 1;
+                            
+                        end
                         write4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr, msg);
                     otherwise
                         error("'%s' is not a valid number of bytes to write.\n", n);

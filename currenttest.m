@@ -5,17 +5,16 @@ robot = Robot();
 motor = robot.motors(1);
 
 motor.toggleTorque(false);
-motor.setOperatingMode("v");
+motor.setOperatingMode("c");
 motor.toggleTorque(true);
 
 
-velocity = 40;
-% velocity = 0xffffffec;
-motor.writeVelocity(velocity)
+current = 2.5;
+motor.writeCurrent(current)
 pause(2.5)
-motor.writeVelocity(0)
+motor.writeCurrent(0)
 pause(2.5)
-motor.writeVelocity(-velocity);
+motor.writeCurrent(-current);
 pause(2.5)
 
 motor.writePosition(-90);
