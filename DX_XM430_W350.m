@@ -107,7 +107,6 @@ classdef DX_XM430_W350
             self.TICKS_PER_mA = 1/2.69; % 1 tick = 2.69 mA
 
             self.startConnection();
-            self.readWriteByte(1, self.DRIVE_MODE, self.TIME_PROF);
         end
 
         function startConnection(self)
@@ -202,6 +201,10 @@ classdef DX_XM430_W350
             % if self.torqueEnable
             %     error("The motor torque must be disabled before running setOperatingMode.")
             % end
+            currentMode = self.readWriteByte(1, self.TORQUE_ENABLE);
+
+            self.toggleTorque(false);
+
             switch mode
                 case {'current', 'c'} 
                     writeMode = self.CURR_CNTR_MD;
@@ -222,6 +225,7 @@ classdef DX_XM430_W350
             % write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.OPR_MODE, writeMode);
             % self.checkPacket(self.OPR_MODE, writeMode)
             self.readWriteByte(1, self.OPR_MODE, writeMode);
+            self.toggleTorque(currentMode);
         end
 
         function checkPacket(self, addr, msg)
