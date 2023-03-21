@@ -1,27 +1,19 @@
-%% Configurations
-clear
-clc
-
-% Shutdown configurations
-onCleanup(@shutdown); % Shutdown configurations
-rosinit; % Initializes ROS
-
 %% Setup robot
-N = 5; % Degree of trajectories
-numPoints = 500; % Number of waypoints per trajectory
-time = 0.35; % Target time for each trajectory
-trajPause = time/(numPoints+1); % Time between waypoints
-travelTime = trajPause;
+numPoints = 100; % Number of waypoints per trajectory
+travelTime = 5;
 gripperTime = 0.5; % Time for gripper to open and close
 pauseTime = travelTime;
 robot = Robot(); % Creates robot object
-robot.writeTime(travelTime); % Write travel time
-robot.writeMotorState(true); % Write position mode
+robot.writeTime(0); % Write travel time
+robot.setOperatingMode('p');
+robot.writeMotorState(true);
 
 startAngle = [0 -20 0 0]; % Angle arm starts
 
 robot.writeJoints(startAngle); % Sends arm to starting angle
-pause(travelTime);
+pause(1);
+
+robot.setOperatingMode('v');
 
 load("cam.mat") % Loads camera in
 
@@ -147,41 +139,50 @@ while ~done % Checks if done variable is set
         % Create a task-space trajectory from current position to right
         % above the ball
         tj = TrajPlanner([robot.getEEPos(readings(1,:)) ; targetBallRobot 100 -90]);
-        traj = tj.getNTraj(travelTime, numPoints, N);
-        trajectoriesAngles = traj(:,2:end);
+        traj = tj.getQuinticTraj(travelTime, numPoints);
+        trajectoriesAngles = traj;
         % Convert calculated task-space trajectories to joint-space
         for i = 1:height(trajectoriesAngles)
             try
-                trajectoriesAngles(i,:) = robot.getIK(traj(i,2:end));
+                trajectoriesAngles(i,2:end) = robot.getIK(traj(i,2:end));
             catch
                 error("End-Effector Pose Unreachable")
             end
         end
         % Sends the robot arm through the trajectory to above the ball
-        for i=1:height(traj)
-            robot.writeJoints(trajectoriesAngles(i,:))
-            pause(trajPause);
+        for i = 1:(height(traj)-1)
+            deltaDis = trajectoriesAngles(i+1,2:end) - trajectoriesAngles(i,2:end);
+            deltaTime = trajectoriesAngles(i+1,1) - trajectoriesAngles(i,1);
+            vels = deltaDis./deltaTime
+            robot.writeVelocities(vels);
+            pause(deltaTime);
         end
+        robot.writeVelocities([0 0 0 0]);
     
         % Read from joints
         readings = robot.getJointsReadings();
         % Create a task-space trajectory from current position to the ball
         tj = TrajPlanner([robot.getEEPos(readings(1,:)) ; targetBallRobot 30 -90]);
-        traj = tj.getNTraj(travelTime, numPoints, N);
-        trajectoriesAngles = traj(:,2:end);
+        traj = tj.getQuinticTraj(travelTime, numPoints);
+        trajectoriesAngles = traj;
         % Convert calculated task-space trajectories to joint-space
         for i = 1:height(trajectoriesAngles)
             try
-                trajectoriesAngles(i,:) = robot.getIK(traj(i,2:end));
+                trajectoriesAngles(i,2:end) = robot.getIK(traj(i,2:end));
             catch
                 error("End-Effector Pose Unreachable")
             end
         end
         % Sends the robot arm through the trajectory to the ball
-        for i=1:height(traj)
-            robot.writeJoints(trajectoriesAngles(i,:))
-            pause(trajPause);
+        for i = 1:(height(traj)-1)
+            deltaDis = trajectoriesAngles(i+1,2:end) - trajectoriesAngles(i,2:end);
+            deltaTime = trajectoriesAngles(i+1,1) - trajectoriesAngles(i,1);
+            vels = deltaDis./deltaTime;
+            robot.writeVelocities(vels);
+            pause(deltaTime);
         end
+        robot.writeVelocities([0 0 0 0]);
+
         % Closes the gripper
         robot.writeGripper(false)
         pause(gripperTime)
@@ -190,21 +191,25 @@ while ~done % Checks if done variable is set
         % Create a task-space trajectory from current position to back
         % above the balls to avoid collision
         tj = TrajPlanner([robot.getEEPos(readings(1,:)) ; targetBallRobot 100 -90]);
-        traj = tj.getNTraj(travelTime, numPoints, N);
-        trajectoriesAngles = traj(:,2:end);
+        traj = tj.getQuinticTraj(travelTime, numPoints);
+        trajectoriesAngles = traj;
         % Convert calculated task-space trajectories to joint-space
         for i = 1:height(trajectoriesAngles)
             try
-                trajectoriesAngles(i,:) = robot.getIK(traj(i,2:end));
+                trajectoriesAngles(i,2:end) = robot.getIK(traj(i,2:end));
             catch
                 error("End-Effector Pose Unreachable")
             end
         end
         % Sends the robot arm through the trajectory to above the balls
-        for i=1:height(traj)
-            robot.writeJoints(trajectoriesAngles(i,:))
-            pause(trajPause);
+        for i = 1:(height(traj)-1)
+            deltaDis = trajectoriesAngles(i+1,2:end) - trajectoriesAngles(i,2:end);
+            deltaTime = trajectoriesAngles(i+1,1) - trajectoriesAngles(i,1);
+            vels = deltaDis./deltaTime;
+            robot.writeVelocities(vels);
+            pause(deltaTime);
         end
+        robot.writeVelocities([0 0 0 0]);
         % Picks the sorting location based on the color of the target ball
         switch targetBallColor
             case "red"
@@ -225,22 +230,26 @@ while ~done % Checks if done variable is set
         % Create a task-space trajectory from current position to target
         % sorting location
         tj = TrajPlanner([robot.getEEPos(readings(1,:)) ; location]);
-        traj = tj.getNTraj(travelTime, numPoints, N);
-        trajectoriesAngles = traj(:,2:end);
+        traj = tj.getQuinticTraj(travelTime, numPoints);
+        trajectoriesAngles = traj;
         % Convert calculated task-space trajectories to joint-space
         for i = 1:height(trajectoriesAngles)
             try
-                trajectoriesAngles(i,:) = robot.getIK(traj(i,2:end));
+                trajectoriesAngles(i,2:end) = robot.getIK(traj(i,2:end));
             catch
                 error("End-Effector Pose Unreachable")
             end
         end
         % Sends the robot arm through the trajectory to the sorting
         % location
-        for i=1:height(traj)
-            robot.writeJoints(trajectoriesAngles(i,:))
-            pause(trajPause);
+        for i = 1:(height(traj)-1)
+            deltaDis = trajectoriesAngles(i+1,2:end) - trajectoriesAngles(i,2:end);
+            deltaTime = trajectoriesAngles(i+1,1) - trajectoriesAngles(i,1);
+            vels = deltaDis./deltaTime;
+            robot.writeVelocities(vels);
+            pause(deltaTime);
         end
+        robot.writeVelocities([0 0 0 0]);
         % Opens the gripper, dropping the ball at the location
         robot.writeGripper(true);
     end

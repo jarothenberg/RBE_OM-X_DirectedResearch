@@ -234,7 +234,7 @@ classdef DX_XM430_W350
             packetError = (dxl_comm_result ~= self.COMM_SUCCESS) || (dxl_error ~= 0);
 
             if exist("msg", "var") && packetError
-                fprintf('[msg] %s\n', int32(msg))
+                fprintf('[msg] %f\n', msg)
             end
 
             if dxl_comm_result ~= self.COMM_SUCCESS
@@ -248,26 +248,28 @@ classdef DX_XM430_W350
 
         function byte = readWriteByte(self, n, addr, msg)
             if exist("msg", "var")
+                fprintf("Msg: %f\n", msg)
+                msg = round(msg);
+
                 switch n
                     case {1}
-                        msg = int8(msg);
                         if msg < 0 % Convert to 2s complement 32 bit int because MATLAB is stupid
                             msg = 0xff + msg + 1;
                         end
+                        msg = uint8(msg);
                         write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr, msg);
                     case {2}
-                        msg = int16(msg);
                         if msg < 0 % Convert to 2s complement 32 bit int because MATLAB is stupid
                             msg = 0xffff + msg + 1;
                         end
+                        msg = uint16(msg);
                         write2ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr, msg);
                     case {4}
-                        % disp(msg)
-                        msg = int32(msg);
+                        
                         if msg < 0 % Convert to 2s complement 32 bit int because MATLAB is stupid
                             msg = 0xffffffff + msg + 1;
-                            
                         end
+                        msg = uint32(msg);
                         write4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr, msg);
                     otherwise
                         error("'%s' is not a valid number of bytes to write.\n", n);

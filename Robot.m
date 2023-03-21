@@ -3,10 +3,11 @@
 classdef Robot
 
     properties
-        motors;
-        gripper;
+        % DX_XM430_W350 Servos
+        motorsNum;
+        motors; % 4 Motors, joints 1-4
+        gripper; % Gripper end-effector
 
-        % From old Robot class
         mDim; % Stores the robot link dimentions (cm)
         mOtherDim; % Stores extraneous second link dimensions (cm)
         % Forward Kinematics variables  
@@ -15,27 +16,29 @@ classdef Robot
 
     methods
         function self = Robot()
-            motorsNum = 4;
+            self.motorsNum = 4;
             motorIDs = [11, 12, 13, 14];
             gripperID = 15;
 
+            % Find serial port and connect to it
             try
                 devices = serialportlist();
                 deviceName = convertStringsToChars(devices(1));
             catch exception
                 error("Failed to connect via serial, no devices found.")
             end
-            % Find serial port and connect to it
             
-
-            for i=1:motorsNum
+            % Create array of motors
+            for i=1:self.motorsNum
                 self.motors = [self.motors; DX_XM430_W350(motorIDs(i), deviceName)];
             end
+
+            % Create Gripper and set operating mode/torque
             self.gripper = DX_XM430_W350(gripperID, deviceName);
             self.gripper.setOperatingMode('p');
             self.gripper.toggleTorque(true);
 
-            % From old Robot class
+            % Robot Dimensions
             self.mDim = [77, 130, 124, 126]; % (mm)
             self.mOtherDim = [128, 24]; % (mm)
             % Forward Kinematics variables
@@ -126,10 +129,73 @@ classdef Robot
                 end
             end
         end
+
+        %% Forward Kinematics Methods
+
+        % Given a row from the DH table, return the corresponding A matrix 
+        % (Homogeneous Transformation Matrix).
+        % row [1x4 double] - one row of the DH table to get the A matrix
+        function A = getDHRowMat(self, row)
+            theta = row(1);
+            d = row(2);
+            a = row(3);
+            alpha = row(4);
+
+            % Fill out A matrix based on DH conventions
+            A(1,:) = [cosd(theta) -sind(theta)*cosd(alpha) sind(theta)*sind(alpha) a*cosd(theta)];
+            A(2,:) = [sind(theta) cosd(theta)*cosd(alpha) -cosd(theta)*sind(alpha) a*sind(theta)];
+            A(3,:) = [0 sind(alpha) cosd(alpha) d];
+            A(4,:) = [0 0 0 1];
+        end
+
+        % Given the 4 joint angles of each joint, return the 4 A matrices
+        % jointAngles [1x4 double] - The joint angles of the robot arm in
+        % rad
+        % returns: 4x4x4 matrix: [A0 A1 A2 A3]
+        function AMat = getIntMat(self, jointAngles)
+            AMat = zeros(4,4,4);
+
+            % copy DH table and fill in with actual joint angles
+            dhTable = self.mDHTable;
+            dhTable(:,1) = dhTable(:,1) + jointAngles'; 
+
+            % Calculate each A matrix from corresponding row of DH table
+            for i = 1:4
+                AMat(:,:,i) = self.getDHRowMat(dhTable(i,:));
+            end
+        end
+
+        % Given the 4 joint angles of each joint, return T0_4
+        % (Transformation from end effector frame to base frame)
+        % jointAngles [1x4 double] - The joint angles of the robot arm in
+        % rad
+        % returns: 4x4 matrix: T0_4
+        function T = getFK(self, jointAngles)
+            % Get A matrices to multiply together
+            AMat = self.getIntMat(jointAngles);
+
+            % T_1^0 = A_1
+            T = AMat(:,:,1);
+            % post-multiply all A matrices in order to get in T_4^0
+            for i = 2:4
+                T = T * AMat(:,:,i);
+            end
+        end
+
+        % Return end-effector position (x,y,z in mm) based on the given
+        % joint angles
+        % returns: 1x3 array: Position wrt the base frame in mm in the
+        % x,y,and z direction
+        function eePos = getEEPos(self, q)
+            T = self.getFK(q); % Get T matrices
+            d = T(1:3,4)'; % Extract translation vector
+
+            eePos = [d -(q(2)+q(3)+q(4))]; % Transpose to get EE coordinates
+        end
         
         function readings = getJointsReadings(self)
             readings = zeros(3,4);
-            for i = 1:length(self.motors)
+            for i = 1:self.motorsNum
                 motor = self.motors(i);
                 readings(:,i) = motor.getJointReadings();
                 % fprintf('[ID:%03d] PresPos:%.9f\tPresVel:%.3f\tPresCur:%.3f\n', motor.ID, readings(1,i), readings(2,i), readings(3,i));
@@ -137,22 +203,29 @@ classdef Robot
         end
 
         function setOperatingMode(self, mode)
-            for i=1:length(self.motors)
+            for i=1:self.motorsNum
                 motor = self.motors(i);
                 motor.setOperatingMode(mode);
             end
         end
 
         function writeJoints(self, goals)
-            for i=1:length(self.motors)
+            for i=1:self.motorsNum
                 motor = self.motors(i);
                 motor.writePosition(goals(i));
+            end
+        end
+
+        function writeVelocities(self, vels)
+            for i=1:self.motorsNum
+                motor = self.motors(i);
+                motor.writeVelocity(vels(i));
             end
         end
         
 
         function writeMotorState(self, enable)
-            for i=1:length(self.motors)
+            for i=1:self.motorsNum
                 self.motors(i).toggleTorque(enable);
             end
         end
@@ -161,7 +234,7 @@ classdef Robot
             if ~exist("acc_time", "var")
                 acc_time = time/3;
             end
-            for i=1:length(self.motors)
+            for i=1:self.motorsNum
                 self.motors(i).writeTime(time, acc_time);
             end
         end
