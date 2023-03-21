@@ -87,7 +87,7 @@ classdef DX_XM430_W350
             self.PWM_CNTR_MD = 16;
 
             % Unit Conversions
-            self.TICKS_PER_ANGVEL = 0.229 * 6; % 1 tick = 0.229*2 rev/min = 0.229*360/60 deg/s
+            self.TICKS_PER_ANGVEL = 1/(0.229 * 6); % 1 tick = 0.229*2 rev/min = 0.229*360/60 deg/s
             self.TICKS_PER_ROT = 4096;
             self.TICKS_PER_DEG = self.TICKS_PER_ROT/360;
             self.TICK_POS_OFFSET = self.TICKS_PER_ROT/2; % position value for a joint angle of 0 (2048 for this case)
@@ -102,7 +102,7 @@ classdef DX_XM430_W350
 
             % Open port
             if (openPort(self.PORT_NUM))
-                fprintf('Succeeded to open the port!\n');
+%                 fprintf('Succeeded to open the port!\n');
             else
                 unloadlibrary(self.LIB_NAME);
                 fprintf('Failed to open the port!\n');
@@ -112,7 +112,7 @@ classdef DX_XM430_W350
 
             % Set port baudrate
             if (setBaudRate(self.PORT_NUM, self.BAUDRATE))
-                fprintf('Succeeded to change the baudrate!\n');
+%                 fprintf('Succeeded to change the baudrate!\n');
             else
                 unloadlibrary(self.LIB_NAME);
                 fprintf('Failed to change the baudrate!\n');
@@ -128,23 +128,18 @@ classdef DX_XM430_W350
         function readings = getJointReadings(self)  
             readings = zeros(1,3);
             
-            cur_pos = self.readWriteByte(4, self.CURR_POSITION);
-            cur_vel = self.readWriteByte(4, self.CURR_VELOCITY);
-            cur_curr = self.readWriteByte(2, self.CURR_CURRENT);
-
-            % disp(cur_pos)
-            
-            % cur_vel = int32(cur_vel);
-            % cur_curr = int32(cur_curr);
+            cur_pos = self.readWriteByte(self.POS_LEN, self.CURR_POSITION);
+            cur_vel = self.readWriteByte(self.VEL_LEN, self.CURR_VELOCITY);
+            cur_curr = self.readWriteByte(self.CURR_LEN, self.CURR_CURRENT);
 
             cur_pos = (cur_pos - self.TICK_POS_OFFSET) / self.TICKS_PER_DEG;
             cur_vel = cur_vel / self.TICKS_PER_ANGVEL;
             
             readings(1) = cur_pos;
             readings(2) = cur_vel;
-            % readings(3) = cur_curr;
+            readings(3) = cur_curr;
 
-%             fprintf('[ID:%03d] PresPos:%03d\tPresCur:%03d\tPresVel:%03d\n', self.ID, cur_pos, cur_curr, cur_vel);
+            fprintf('[ID:%03d] PresPos:%03d\tPresCur:%03d\tPresVel:%03d\n', self.ID, cur_pos, cur_curr, cur_vel);
         end
 
         function writePosition(self, angle)
@@ -152,17 +147,14 @@ classdef DX_XM430_W350
             %     error("writePosition called by motor id:%d is not in position control mode.", self.ID)
             % end
 
-            position = mod(typecast(uint32(angle * self.TICKS_PER_DEG + self.TICK_POS_OFFSET), 'int32'), self.TICKS_PER_ROT);
-            self.readWriteByte(4, self.GOAL_POSITION, position);
+            position = mod(round(angle * self.TICKS_PER_DEG + self.TICK_POS_OFFSET), self.TICKS_PER_ROT);
+            self.readWriteByte(self.POS_LEN, self.GOAL_POSITION, position);
         end
 
         function writeVelocity(self, velocity)
-            velTicks = velocity;
-            % 
-            % velTicks = velocity * self.TICKS_PER_ANGVEL; 
+
+            velTicks = round(velocity * self.TICKS_PER_ANGVEL); 
             % disp(velTicks)
-            % velTicks = typecast(uint32(velTicks), 'int32');
-            disp(velTicks)
             
             % if (self.writeMode ~= self.VEL_CNTR_MD)
             %     error("writeVelocity called by motor id:%d is not in velocity control mode.", self.ID)
@@ -170,7 +162,7 @@ classdef DX_XM430_W350
 
             % write4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.GOAL_VELOCITY, velocityInTicks);
             % self.checkPacket(self.GOAL_VELOCITY, velocityInTicks);
-            self.readWriteByte(4, self.GOAL_VELOCITY, velTicks);
+            self.readWriteByte(self.VEL_LEN, self.GOAL_VELOCITY, velTicks);
         end
 
         function writeCurrent(self, currentInTicks)
@@ -180,7 +172,7 @@ classdef DX_XM430_W350
 
             % write2ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.GOAL_CURRENT, currentInTicks);
             % self.checkPacket(self.GOAL_CURRENT, currentInTicks);
-            self.readWriteByte(2, self.GOAL_CURRENT, currentInTicks);
+            self.readWriteByte(self.CURR_LEN, self.GOAL_CURRENT, currentInTicks);
         end
 
         function toggleTorque(self, enable)
@@ -250,9 +242,8 @@ classdef DX_XM430_W350
         end
 
         function byte = readWriteByte(self, n, addr, msg)
-            
             if exist("msg", "var")
-                
+                msg = round(msg);
                 switch n
                     case {1}
                         if msg < 0 % Convert to 2s complement 32 bit int because MATLAB is stupid
@@ -265,7 +256,7 @@ classdef DX_XM430_W350
                         end
                         write2ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr, msg);
                     case {4}
-                        disp(msg)
+                        % disp(msg)
                         if msg < 0 % Convert to 2s complement 32 bit int because MATLAB is stupid
                             msg = 0xffffffff + msg + 1;
                             
