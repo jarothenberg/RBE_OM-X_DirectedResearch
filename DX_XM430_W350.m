@@ -34,10 +34,11 @@ classdef DX_XM430_W350
         PWM_CNTR_MD;
 
         % Unit Conversions
-        TICKS_PER_ANGVEL;
+        TICK_POS_OFFSET;
         TICKS_PER_ROT;
         TICKS_PER_DEG;
-        TICK_POS_OFFSET;
+        TICKS_PER_ANGVEL;
+        TICKS_PER_mA;
 
         % Variables
         ID; % Dynamixel ID
@@ -87,10 +88,11 @@ classdef DX_XM430_W350
             self.PWM_CNTR_MD = 16;
 
             % Unit Conversions
-            self.TICKS_PER_ANGVEL = 1/(0.229 * 6); % 1 tick = 0.229*2 rev/min = 0.229*360/60 deg/s
             self.TICKS_PER_ROT = 4096;
             self.TICKS_PER_DEG = self.TICKS_PER_ROT/360;
             self.TICK_POS_OFFSET = self.TICKS_PER_ROT/2; % position value for a joint angle of 0 (2048 for this case)
+            self.TICKS_PER_ANGVEL = 1/(0.229 * 6); % 1 tick = 0.229 rev/min = 0.229*360/60 deg/s
+            self.TICKS_PER_mA = 1/2.69; % 1 tick = 2.69 mA
 
             self.startConnection();
             self.writeMode = self.readWriteByte(1, self.OPR_MODE);
@@ -134,6 +136,7 @@ classdef DX_XM430_W350
 
             cur_pos = (cur_pos - self.TICK_POS_OFFSET) / self.TICKS_PER_DEG;
             cur_vel = cur_vel / self.TICKS_PER_ANGVEL;
+            cur_curr = cur_curr / self.TICKS_PER_mA;
             
             readings(1) = cur_pos;
             readings(2) = cur_vel;
@@ -153,7 +156,7 @@ classdef DX_XM430_W350
 
         function writeVelocity(self, velocity)
 
-            velTicks = round(velocity * self.TICKS_PER_ANGVEL); 
+            velTicks = velocity * self.TICKS_PER_ANGVEL; 
             % disp(velTicks)
             
             % if (self.writeMode ~= self.VEL_CNTR_MD)
@@ -165,10 +168,8 @@ classdef DX_XM430_W350
             self.readWriteByte(self.VEL_LEN, self.GOAL_VELOCITY, velTicks);
         end
 
-        function writeCurrent(self, currentInTicks)
-            if (self.writeMode ~= self.CURR_CNTR_MD)
-                error("writeCurrent called by motor id:%d is not in current control mode.", self.ID)
-            end
+        function writeCurrent(self, current)
+            currentInTicks = current * self.TICKS_PER_mA;
 
             % write2ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.GOAL_CURRENT, currentInTicks);
             % self.checkPacket(self.GOAL_CURRENT, currentInTicks);

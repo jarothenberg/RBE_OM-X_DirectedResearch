@@ -5,51 +5,33 @@ robot = Robot();
 motor = robot.motors(1);
 
 motor.toggleTorque(false);
+
+pause(2)
+
 motor.setOperatingMode("c");
-motor.toggleTorque(true);
-
-
-current = 2.5;
-motor.writeCurrent(current)
-pause(2.5)
-motor.writeCurrent(0)
-pause(2.5)
-motor.writeCurrent(-current);
-pause(2.5)
-
-motor.writePosition(-90);
-
-pause(1)
-
-motor.toggleTorque(false);
-motor.setOperatingMode("v");
 robot.toggleTorque(true);
 
-pause(1)
+pause(2)
 
-speeds = [10 20 30 40 50];
+currents = [1500];
+travelTime = 1;
 
-for i=1:5
+for i=1:1
     disp(i)
-    start = motor.getJointReadings();
-    start = start(1);
 
-    speed = speeds(i);
+    current = currents(i);
     
-    pause(1);
-    
-    tic;
-    while (toc < 5)
-        motor.writeVelocity(speed);
+    motor.writeCurrent(current);
+
+    tic
+    while (toc < travelTime)
+        read = motor.getJointReadings()
+        rpm = read(2)/6
     end
     
-    motor.writeVelocity(0);
-    ending = motor.getJointReadings();
-    ending = ending(1);
-    disp(ending-start)
-
+    motor.writeCurrent(0)
     % Send to -90
-    motor.writeVelocity(-speed)
+    motor.writeCurrent(-current);
     pause(5);
-    motor.writeVelocity(0);
+    motor.writeCurrent(0);
 end
