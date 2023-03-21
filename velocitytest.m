@@ -4,14 +4,15 @@ clc
 robot = Robot();
 motor = robot.motors(1);
 
-motor.toggleTorque(false);
+robot.toggleTorque(false)
 
 pause(2)
 
-motor.setOperatingMode("v");
+robot.setOperatingMode("v");
+
+pause(2)
+
 robot.toggleTorque(true);
-
-pause(2)
 
 speeds = [6 12 18 24 30];
 travelTime = 5;

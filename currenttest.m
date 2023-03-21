@@ -9,6 +9,7 @@ motor.toggleTorque(false);
 pause(2)
 
 motor.setOperatingMode("c");
+
 robot.toggleTorque(true);
 
 pause(2)

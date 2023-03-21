@@ -32,8 +32,14 @@ classdef Robot
             for i = 1:length(self.motors)
                 motor = self.motors(i);
                 readings(:,i) = motor.getJointReadings();
-                disp(readings(1,i))
-                fprintf('[ID:%03d] PresPos:%.9f\tPresVel:%.3f\tPresCur:%.3f\n', motor.ID, readings(1,i), readings(2,i), readings(3,i));
+                % fprintf('[ID:%03d] PresPos:%.9f\tPresVel:%.3f\tPresCur:%.3f\n', motor.ID, readings(1,i), readings(2,i), readings(3,i));
+            end
+        end
+
+        function setOperatingMode(self, mode)
+            for i=1:length(self.motors)
+                motor = self.motors(i);
+                motor.setOperatingMode(mode);
             end
         end
 
@@ -43,10 +49,20 @@ classdef Robot
                 motor.writePosition(goals(i));
             end
         end
+        
 
         function toggleTorque(self, enable)
             for i=1:length(self.motors)
                 self.motors(i).toggleTorque(enable);
+            end
+        end
+
+        function writeTime(self, time, acc_time)
+            if ~exist("acc_time", "var")
+                acc_time = time/3;
+            end
+            for i=1:length(self.motors)
+                self.motors(i).writeTime(time, acc_time);
             end
         end
     end

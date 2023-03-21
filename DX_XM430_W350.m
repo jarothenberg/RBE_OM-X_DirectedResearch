@@ -12,13 +12,17 @@ classdef DX_XM430_W350
         COMM_TX_FAIL;
         GROUPWRITE_NUM;
         GROUPREAD_NUM;
+        TRAV_TIME;
 
         % Control Table Constants - see link in constructor
+        DRIVE_MODE;
         OPR_MODE;
         TORQUE_ENABLE;
         LED;
         GOAL_CURRENT;
         GOAL_VELOCITY;
+        PROF_ACC;
+        PROF_VEL;
         GOAL_POSITION;
         CURR_CURRENT;
         CURR_VELOCITY;
@@ -32,6 +36,8 @@ classdef DX_XM430_W350
         EXT_POS_CNTR_MD;
         CURR_POS_CNTR_MD;
         PWM_CNTR_MD;
+        VEL_PROF;
+        TIME_PROF;
 
         % Unit Conversions
         TICK_POS_OFFSET;
@@ -39,10 +45,10 @@ classdef DX_XM430_W350
         TICKS_PER_DEG;
         TICKS_PER_ANGVEL;
         TICKS_PER_mA;
+        MS_PER_S;
 
         % Variables
         ID; % Dynamixel ID
-        writeMode;
         % torqueEnable;
     end
 
@@ -68,11 +74,14 @@ classdef DX_XM430_W350
             self.GROUPREAD_NUM = groupBulkRead(self.PORT_NUM, self.PROTOCOL_VERSION);
 
             % https://emanual.robotis.com/docs/en/dxl/x/xm430-w350/#control-table
+            self.DRIVE_MODE = 10;
             self.OPR_MODE = 11; % https://emanual.robotis.com/docs/en/dxl/x/xm430-w350/#operating-mode11
             self.TORQUE_ENABLE = 64; % Enable Torque Control
             self.LED = 65; % Turn LED on/off
             self.GOAL_CURRENT = 102;
             self.GOAL_VELOCITY = 104;
+            self.PROF_ACC = 108;
+            self.PROF_VEL = 112;
             self.GOAL_POSITION = 116; % Set/Get goal position
             self.CURR_CURRENT = 126;
             self.CURR_VELOCITY = 128;
@@ -86,8 +95,11 @@ classdef DX_XM430_W350
             self.EXT_POS_CNTR_MD = 4;
             self.CURR_POS_CNTR_MD = 5;
             self.PWM_CNTR_MD = 16;
+            self.VEL_PROF = 0;
+            self.TIME_PROF = 4;
 
             % Unit Conversions
+            self.MS_PER_S = 1000;
             self.TICKS_PER_ROT = 4096;
             self.TICKS_PER_DEG = self.TICKS_PER_ROT/360;
             self.TICK_POS_OFFSET = self.TICKS_PER_ROT/2; % position value for a joint angle of 0 (2048 for this case)
@@ -95,17 +107,14 @@ classdef DX_XM430_W350
             self.TICKS_PER_mA = 1/2.69; % 1 tick = 2.69 mA
 
             self.startConnection();
-            self.writeMode = self.readWriteByte(1, self.OPR_MODE);
-            % self.torqueEnable = logical(read1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.TORQUE_ENABLE));
+            self.readWriteByte(1, self.DRIVE_MODE, self.TIME_PROF);
         end
 
         function startConnection(self)
             packetHandler();
 
             % Open port
-            if (openPort(self.PORT_NUM))
-%                 fprintf('Succeeded to open the port!\n');
-            else
+            if (~openPort(self.PORT_NUM))
                 unloadlibrary(self.LIB_NAME);
                 fprintf('Failed to open the port!\n');
                 input('Press any key to terminate...\n');
@@ -113,9 +122,7 @@ classdef DX_XM430_W350
             end
 
             % Set port baudrate
-            if (setBaudRate(self.PORT_NUM, self.BAUDRATE))
-%                 fprintf('Succeeded to change the baudrate!\n');
-            else
+            if (~setBaudRate(self.PORT_NUM, self.BAUDRATE))
                 unloadlibrary(self.LIB_NAME);
                 fprintf('Failed to change the baudrate!\n');
                 input('Press any key to terminate...\n');
@@ -142,51 +149,44 @@ classdef DX_XM430_W350
             readings(2) = cur_vel;
             readings(3) = cur_curr;
 
-            fprintf('[ID:%03d] PresPos:%03d\tPresCur:%03d\tPresVel:%03d\n', self.ID, cur_pos, cur_curr, cur_vel);
+            % fprintf('[ID:%03d] PresPos:%03d\tPresCur:%03d\tPresVel:%03d\n', self.ID, cur_pos, cur_curr, cur_vel);
         end
 
         function writePosition(self, angle)
-            % if (self.writeMode ~= self.POS_CNTR_MD)
-            %     error("writePosition called by motor id:%d is not in position control mode.", self.ID)
-            % end
-
             position = mod(round(angle * self.TICKS_PER_DEG + self.TICK_POS_OFFSET), self.TICKS_PER_ROT);
             self.readWriteByte(self.POS_LEN, self.GOAL_POSITION, position);
         end
 
+        function writeTime(self, time, acc_time)
+            if (~exist("acc_time", "var"))
+                acc_time = time / 3;
+            end
+
+            time_ms = time * self.MS_PER_S;
+            acc_time_ms = acc_time * self.MS_PER_S;
+
+            disp(time_ms)
+            disp(acc_time_ms)
+
+            self.readWriteByte(4, self.PROF_ACC, acc_time_ms);
+            self.readWriteByte(4, self.PROF_VEL, time_ms);
+        end
+
         function writeVelocity(self, velocity)
-
             velTicks = velocity * self.TICKS_PER_ANGVEL; 
-            % disp(velTicks)
-            
-            % if (self.writeMode ~= self.VEL_CNTR_MD)
-            %     error("writeVelocity called by motor id:%d is not in velocity control mode.", self.ID)
-            % end
-
-            % write4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.GOAL_VELOCITY, velocityInTicks);
-            % self.checkPacket(self.GOAL_VELOCITY, velocityInTicks);
             self.readWriteByte(self.VEL_LEN, self.GOAL_VELOCITY, velTicks);
         end
 
         function writeCurrent(self, current)
             currentInTicks = current * self.TICKS_PER_mA;
-
-            % write2ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.GOAL_CURRENT, currentInTicks);
-            % self.checkPacket(self.GOAL_CURRENT, currentInTicks);
             self.readWriteByte(self.CURR_LEN, self.GOAL_CURRENT, currentInTicks);
         end
 
         function toggleTorque(self, enable)
-            % self.torqueEnable = enable;
-            % Enable Dynamixel#1 Torque
-            % write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.TORQUE_ENABLE, enable);
-            % self.checkPacket(self.TORQUE_ENABLE, enable);
             self.readWriteByte(1, self.TORQUE_ENABLE, enable);
         end
 
         function toggleLED(self, enable)
-            % write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.LED, enable);
-            % self.checkPacket(self.LED, enable);
             self.readWriteByte(1, self.LED, enable);
         end
 
@@ -204,24 +204,24 @@ classdef DX_XM430_W350
             % end
             switch mode
                 case {'current', 'c'} 
-                    self.writeMode = self.CURR_CNTR_MD;
+                    writeMode = self.CURR_CNTR_MD;
                 case {'velocity', 'v'}
-                    self.writeMode = self.VEL_CNTR_MD;
+                    writeMode = self.VEL_CNTR_MD;
                 case {'position', 'p'}
-                    self.writeMode = self.POS_CNTR_MD;
+                    writeMode = self.POS_CNTR_MD;
                 case {'ext position', 'ep'}
-                    self.writeMode = self.EXT_POS_CNTR_MD;
+                    writeMode = self.EXT_POS_CNTR_MD;
                 case {'curr position', 'cp'}
-                    self.writeMode = self.CURR_POS_CNTR_MD;
+                    writeMode = self.CURR_POS_CNTR_MD;
                 case {'pwm voltage', 'pwm'}
-                    self.writeMode = self.PWM_CNTR_MD;
+                    writeMode = self.PWM_CNTR_MD;
                 otherwise
                     error("setOperatingMode input cannot be '%s'. See implementation in DX_XM430_W350 class.", mode)
             end
 
-            % write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.OPR_MODE, self.writeMode);
-            % self.checkPacket(self.OPR_MODE, self.writeMode)
-            self.readWriteByte(1, self.OPR_MODE, self.writeMode);
+            % write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, self.OPR_MODE, writeMode);
+            % self.checkPacket(self.OPR_MODE, writeMode)
+            self.readWriteByte(1, self.OPR_MODE, writeMode);
         end
 
         function checkPacket(self, addr, msg)
@@ -244,20 +244,22 @@ classdef DX_XM430_W350
 
         function byte = readWriteByte(self, n, addr, msg)
             if exist("msg", "var")
-                msg = round(msg);
                 switch n
                     case {1}
+                        msg = int8(msg);
                         if msg < 0 % Convert to 2s complement 32 bit int because MATLAB is stupid
                             msg = 0xff + msg + 1;
                         end
                         write1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr, msg);
                     case {2}
+                        msg = int16(msg);
                         if msg < 0 % Convert to 2s complement 32 bit int because MATLAB is stupid
                             msg = 0xffff + msg + 1;
                         end
                         write2ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr, msg);
                     case {4}
                         % disp(msg)
+                        msg = int32(msg);
                         if msg < 0 % Convert to 2s complement 32 bit int because MATLAB is stupid
                             msg = 0xffffffff + msg + 1;
                             
