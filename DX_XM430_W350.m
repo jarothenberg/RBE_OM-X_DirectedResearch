@@ -136,10 +136,10 @@ classdef DX_XM430_W350
         function readings = getJointReadings(self)  
             readings = zeros(1,3);
             
-            cur_pos = self.readWriteByte(self.POS_LEN, self.CURR_POSITION);
-            cur_vel = self.readWriteByte(self.VEL_LEN, self.CURR_VELOCITY);
-            cur_curr = self.readWriteByte(self.CURR_LEN, self.CURR_CURRENT);
-
+            cur_pos = double(self.readWriteByte(self.POS_LEN, self.CURR_POSITION));
+            cur_vel = double(self.readWriteByte(self.VEL_LEN, self.CURR_VELOCITY));
+            cur_curr = double(self.readWriteByte(self.CURR_LEN, self.CURR_CURRENT));
+            
             cur_pos = (cur_pos - self.TICK_POS_OFFSET) / self.TICKS_PER_DEG;
             cur_vel = cur_vel / self.TICKS_PER_ANGVEL;
             cur_curr = cur_curr / self.TICKS_PER_mA;
@@ -248,7 +248,7 @@ classdef DX_XM430_W350
 
         function byte = readWriteByte(self, n, addr, msg)
             if exist("msg", "var")
-                fprintf("Msg: %f\n", msg)
+%                 fprintf("Msg: %f\n", msg)
                 msg = round(msg);
 
                 switch n
@@ -279,12 +279,22 @@ classdef DX_XM430_W350
                 switch n
                     case {1}
                         byte = read1ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr);
-
+                        if byte > 0x7f % Convert to 2s complement 32 bit int because MATLAB is stupid
+                            byte = 0xff - byte + 1;
+                            byte = -1*double(byte);
+                        end
                     case {2}
                         byte = read2ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr);
-
+                        if byte > 0x7fff % Convert to 2s complement 32 bit int because MATLAB is stupid
+                            byte = 0xffff - byte + 1;
+                            byte = -1*double(byte);
+                        end
                     case {4}
                         byte = read4ByteTxRx(self.PORT_NUM, self.PROTOCOL_VERSION, self.ID, addr);
+                        if byte > 0x7fffffff % Convert to 2s complement 32 bit int because MATLAB is stupid
+                            byte = 0xffffffff - byte + 1;
+                            byte = -1*double(byte);
+                        end
                     otherwise
                         error("'%s' is not a valid number of bytes to read.\n", n);
                 end
