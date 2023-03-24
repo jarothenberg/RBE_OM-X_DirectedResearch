@@ -3,8 +3,17 @@
 classdef Robot
 
     properties
+        % Constants
+        PROTOCOL_VERSION;
+        PORT_NUM;
+        BAUDRATE;
+        COMM_SUCCESS;
+        COMM_TX_FAIL;
+
         % DX_XM430_W350 Servos
         motorsNum;
+        motorIDs;
+        gripperID;
         motors; % 4 Motors, joints 1-4
         gripper; % Gripper end-effector
 
@@ -12,14 +21,37 @@ classdef Robot
         mOtherDim; % Stores extraneous second link dimensions (cm)
         % Forward Kinematics variables  
         mDHTable; % DH Table for the arm. Thetas need to be added to the joint angles first
+
+        groupwrite_num;
+        groupread_num;
+
+        % Conversions
+        TICKS_PER_ROT;
+        TICKS_PER_DEG;
+        TICK_POS_OFFSET;
+        TICKS_PER_ANGVEL;
+        TICKS_PER_mA;
+        MS_PER_S;
+
     end
 
     methods
         function self = Robot()
+            self.PROTOCOL_VERSION = 2.0;
+            self.BAUDRATE = 1000000;
+            self.COMM_SUCCESS = 0;
+            self.COMM_TX_FAIL = -1001;
             self.motorsNum = 4;
-            motorIDs = [11, 12, 13, 14];
-            gripperID = 15;
+            self.motorIDs = [11, 12, 13, 14];
+            self.gripperID = 15;
 
+            self.MS_PER_S = 1000;
+            self.TICKS_PER_ROT = 4096;
+            self.TICKS_PER_DEG = self.TICKS_PER_ROT/360;
+            self.TICK_POS_OFFSET = self.TICKS_PER_ROT/2; % position value for a joint angle of 0 (2048 for this case)
+            self.TICKS_PER_ANGVEL = 1/(0.229 * 6); % 1 tick = 0.229 rev/min = 0.229*360/60 deg/s
+            self.TICKS_PER_mA = 1/2.69; % 1 tick = 2.69 mA
+            
             % Find serial port and connect to it
             try
                 devices = serialportlist();
@@ -27,14 +59,18 @@ classdef Robot
             catch exception
                 error("Failed to connect via serial, no devices found.")
             end
+            self.PORT_NUM = portHandler(deviceName);
+
+            self.groupwrite_num = groupBulkWrite(self.PORT_NUM, self.PROTOCOL_VERSION);
+            self.groupread_num = groupBulkRead(self.PORT_NUM, self.PROTOCOL_VERSION);
             
             % Create array of motors
             for i=1:self.motorsNum
-                self.motors = [self.motors; DX_XM430_W350(motorIDs(i), deviceName)];
+                self.motors = [self.motors; DX_XM430_W350(self.motorIDs(i), deviceName)];
             end
 
             % Create Gripper and set operating mode/torque
-            self.gripper = DX_XM430_W350(gripperID, deviceName);
+            self.gripper = DX_XM430_W350(self.gripperID, deviceName);
             self.gripper.setOperatingMode('p');
             self.gripper.toggleTorque(true);
 
@@ -254,11 +290,10 @@ classdef Robot
         
         function readings = getJointsReadings(self)
             readings = zeros(3,4);
-            for i = 1:self.motorsNum
-                motor = self.motors(i);
-                readings(:,i) = motor.getJointReadings();
-                % fprintf('[ID:%03d] PresPos:%.9f\tPresVel:%.3f\tPresCur:%.3f\n', motor.ID, readings(1,i), readings(2,i), readings(3,i));
-            end
+            
+            readings(1, :) = (self.bulkReadWrite(4, self.gripper.CURR_POSITION) - self.TICK_POS_OFFSET) ./ self.TICKS_PER_DEG;
+            readings(2, :) = self.bulkReadWrite(4, self.gripper.CURR_VELOCITY) ./ self.TICKS_PER_ANGVEL;
+            readings(3, :) = self.bulkReadWrite(2, self.gripper.CURR_CURRENT) ./ self.TICKS_PER_mA;
         end
 
         % Returns the joint positions, velocities, and currents
@@ -270,40 +305,53 @@ classdef Robot
         end
 
         function setOperatingMode(self, mode)
-            for i=1:self.motorsNum
-                motor = self.motors(i);
-                motor.setOperatingMode(mode);
+            switch mode
+                case {'current', 'c'} 
+                    writeMode = self.gripper.CURR_CNTR_MD;
+                case {'velocity', 'v'}
+                    writeMode = self.gripper.VEL_CNTR_MD;
+                case {'position', 'p'}
+                    writeMode = self.gripper.POS_CNTR_MD;
+                case {'ext position', 'ep'}
+                    writeMode = self.gripper.EXT_POS_CNTR_MD;
+                case {'curr position', 'cp'}
+                    writeMode = self.gripper.CURR_POS_CNTR_MD;
+                case {'pwm voltage', 'pwm'}
+                    writeMode = self.gripper.PWM_CNTR_MD;
+                otherwise
+                    error("setOperatingMode input cannot be '%s'. See implementation in DX_XM430_W350 class.", mode)
             end
+            self.writeMotorState(false);
+            self.bulkReadWrite(1, self.gripper.OPR_MODE, writeMode);
+            self.writeMotorState(true);
         end
 
         function writeJoints(self, goals)
-            for i=1:self.motorsNum
-                motor = self.motors(i);
-                motor.writePosition(goals(i));
-            end
+            goals = mod(round(goals .* self.TICKS_PER_DEG + self.TICK_POS_OFFSET), self.TICKS_PER_ROT);
+            
+            self.bulkReadWrite(4, self.gripper.GOAL_POSITION, goals);
         end
 
         function writeVelocities(self, vels)
-            for i=1:self.motorsNum
-                motor = self.motors(i);
-                motor.writeVelocity(vels(i));
-            end
+            vels = round(vels .* self.TICKS_PER_ANGVEL)
+
+            self.bulkReadWrite(4, self.gripper.GOAL_VELOCITY, vels);
         end
-        
 
         function writeMotorState(self, enable)
-            for i=1:self.motorsNum
-                self.motors(i).toggleTorque(enable);
-            end
+            self.bulkReadWrite(1, self.gripper.TORQUE_ENABLE, enable);
         end
 
         function writeTime(self, time, acc_time)
-            if ~exist("acc_time", "var")
-                acc_time = time/3;
+            if (~exist("acc_time", "var"))
+                acc_time = time / 3;
             end
-            for i=1:self.motorsNum
-                self.motors(i).writeTime(time, acc_time);
-            end
+
+            time_ms = time * self.MS_PER_S;
+            acc_time_ms = acc_time * self.MS_PER_S;
+
+            self.bulkReadWrite(4, self.gripper.PROF_ACC, acc_time_ms);
+            self.bulkReadWrite(4, self.gripper.PROF_VEL, time_ms);
         end
 
         function writeGripper(self, isOpen)
@@ -312,6 +360,87 @@ classdef Robot
                 gripper.writePosition(-35);
             else
                 gripper.writePosition(55);
+            end
+        end
+
+        function result = bulkReadWrite(self, n, addr, msgs)
+            if ~exist("msgs", "var") % Bulk Read
+                groupBulkReadClearParam(self.groupread_num);
+                
+                result = zeros(1,4);
+                for id = self.motorIDs
+                    % Add parameter storage for Dynamixel
+                    dxl_addparam_result = groupBulkReadAddParam(self.groupread_num, id, addr, n);
+                    if dxl_addparam_result ~= true
+                        fprintf('[ID:%03d ADDR:%d] groupBulkRead addparam failed\n', id, addr);
+                        return;
+                    end
+                end
+
+                % Bulkread present position and moving status
+                groupBulkReadTxRxPacket(self.groupread_num);
+                dxl_comm_result = getLastTxRxResult(self.PORT_NUM, self.PROTOCOL_VERSION);
+                if dxl_comm_result ~= self.COMM_SUCCESS
+                    fprintf('%s\n', getTxRxResult(self.PROTOCOL_VERSION, dxl_comm_result));
+                end
+
+                for i = 1:length(self.motorIDs)
+                    id = self.motorIDs(i);
+                    % Check if groupbulkread data of Dynamixel#1 is available
+                    dxl_getdata_result = groupBulkReadIsAvailable(self.groupread_num, id, addr, n);
+                    if dxl_getdata_result ~= true
+                        fprintf('[ID:%03d ADDR:%d] groupBulkRead getdata failed\n', id, addr);
+                        return;
+                    end
+                    
+                    % Get Dynamixels present position values
+                    readBits = groupBulkReadGetData(self.groupread_num, id, addr, n);
+                    % Printing
+                    switch (n)
+                        case {1}
+                            result(i) = typecast(uint8(readBits), 'int8');
+                        case {2}
+                            result(i) = typecast(uint16(readBits), 'int16');
+                        case {4}
+                            result(i) = typecast(uint32(readBits), 'int32');
+                        otherwise
+                            error("'%s' is not a valid number of bytes to read.\n", n);
+                    end
+                end
+                
+            else % Bulk Write
+                switch(n)
+                    case {1}
+                        msgs = typecast(int8(msgs), 'uint8');
+                    case {2}
+                        msgs = typecast(int16(msgs), 'uint16');
+                    case {4}
+                        msgs = typecast(int32(msgs), 'uint32');
+                    otherwise
+                        error("'%s' is not a valid number of bytes to write.\n", n);
+                end
+
+                if length(msgs) == 1
+                    msgs = repelem(msgs, 4);
+                end
+
+                groupBulkWriteClearParam(self.groupwrite_num);
+                for i = 1:length(self.motorIDs)
+                    id = self.motorIDs(i);
+                    dxl_addparam_result = groupBulkWriteAddParam(self.groupwrite_num, id, addr, n, msgs(i), n);
+                    if dxl_addparam_result ~= true
+                        fprintf('[ID:%03d ADDR:%d MSG:%d] groupBulkWrite addparam failed\n', id, addr, msgs(i));
+                        return;
+                    end
+                end
+                
+                % Bulkwrite
+                groupBulkWriteTxPacket(self.groupwrite_num);
+                dxl_comm_result = getLastTxRxResult(self.PORT_NUM, self.PROTOCOL_VERSION);
+                if dxl_comm_result ~= self.COMM_SUCCESS
+                    fprintf('%s\n', getTxRxResult(self.PROTOCOL_VERSION, dxl_comm_result));
+                end
+                
             end
         end
     end

@@ -2,7 +2,6 @@
 clear
 clc
 
-travelTime = 5; % Defines the travel time
 robot = Robot(); % Creates robot object
 
 % Define setpoint poses
