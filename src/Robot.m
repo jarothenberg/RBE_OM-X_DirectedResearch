@@ -396,10 +396,30 @@ classdef Robot
                     % Get Dynamixels present position values
                     readBits = groupBulkReadGetData(self.groupread_num, id, addr, n);
                     % Printing
-                    result(i) = typecast(uint32(readBits), 'int32');
-                    % fprintf('[ID:%03d ADDR:%d] Pos: %d\n', id, addr(i), result(i));
+                    switch (n)
+                        case {1}
+                            result(i) = typecast(uint8(readBits), 'int8');
+                        case {2}
+                            result(i) = typecast(uint16(readBits), 'int16');
+                        case {4}
+                            result(i) = typecast(uint32(readBits), 'int32');
+                        otherwise
+                            error("'%s' is not a valid number of bytes to read.\n", n);
+                    end
                 end
+                
             else % Bulk Write
+                switch(n)
+                    case {1}
+                        msgs = typecast(int8(msgs), 'uint8');
+                    case {2}
+                        msgs = typecast(int16(msgs), 'uint16');
+                    case {4}
+                        msgs = typecast(int32(msgs), 'uint32');
+                    otherwise
+                        error("'%s' is not a valid number of bytes to write.\n", n);
+                end
+
                 if length(msgs) == 1
                     msgs = repelem(msgs, 4);
                 end

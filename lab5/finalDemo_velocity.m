@@ -1,6 +1,6 @@
 %% Setup robot
-numPoints = 100; % Number of waypoints per trajectory
-travelTime = 5;
+numPoints = 500; % Number of waypoints per trajectory
+travelTime = 1;
 gripperTime = 0.5; % Time for gripper to open and close
 pauseTime = travelTime;
 robot = Robot(); % Creates robot object

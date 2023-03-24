@@ -3,8 +3,8 @@ clear
 clc
 
 % Moves too slowly for too many points (too small of a distance to move)
-travelTime = 6; % Defines the travel time
-numPoints = 50;
+travelTime = 3; % Defines the travel time
+numPoints = 500;
 robot = Robot(); % Creates robot object
 
 % Define setpoint angles
@@ -42,6 +42,7 @@ for i = 2:height(trajectories)
     while toc < (i-1) * pauseTime
         jointReadings = robot.getJointsReadings();
         dataTime(count) = toc;
+        dataEePoses(count, :) = robot.getEEPos(jointReadings(1,:));
         count = count + 1;
     end
 end

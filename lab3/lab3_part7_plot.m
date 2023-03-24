@@ -1,11 +1,6 @@
 clear
 clc
 
-%% Configurations
-
-% Shutdown configurations
-onCleanup(@shutdown); % Shutdown configurations
-rosinit; % Initializes ROS
 %% Plotting
 
 % Load Data
@@ -15,8 +10,6 @@ eePoses = data.eePose;
 angles = data.angles;
 endTime = time(end);
 % Filter out spikes, ee pose x pos gets above a certain value
-time = time(eePoses(:,1)<271.9);
-eePoses = eePoses(eePoses(:,1)<271.9,:);
 robot = Robot();
 model = Model();
 
@@ -52,11 +45,4 @@ for i=1:derivativeNum+1
     % Calculate derivative of data (d/dt) for next loop
     yData = (yData(2:end,:) - yData(1:end-1,:)) ./ (xData(2:end,:) - xData(1:end-1,:));
     xData = xData(2:end);
-end
-
-
-% Shutsdown ROS
-function shutdown()
-    disp("Shutting Down...");
-        rosshutdown;
 end

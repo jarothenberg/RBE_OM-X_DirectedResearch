@@ -1,15 +1,15 @@
 %% Configurations
 clear
 clc
-
+close all
 
 %% Setup robot
 N = 5; % Degree of trajectories
-numPoints = 50; % 500 Number of waypoints per trajectory
-time = 1; % 0.35 Target time for each trajectory
+numPoints = 500; % 500 Number of waypoints per trajectory
+time = 0.5; % 0.35 Target time for each trajectory
 trajPause = time/(numPoints+1); % Time between waypoints
 travelTime = trajPause;
-gripperTime = 0.75; % 0.5 Time for gripper to open and close
+gripperTime = 0.5; % 0.5 Time for gripper to open and close
 pauseTime = travelTime;
 robot = Robot(); % Creates robot object
 robot.writeTime(travelTime); % Write travel time

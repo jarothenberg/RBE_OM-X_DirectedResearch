@@ -2,7 +2,7 @@
 clear
 clc
 
-travelTime = 5; % Defines the travel time
+travelTime = 3; % Defines the travel time
 robot = Robot(); % Creates robot object
 
 % Define setpoint poses
@@ -43,7 +43,7 @@ for i = 2:height(trajectoriesAngles)
     % Collect a reading periodically until the setpoint is reached
     while toc < (i-1) * pauseTime
         %disp(toc)
-        jointReadings = robot.getJointsReadingsRadians();
+        jointReadings = robot.getJointsReadings();
         dataTime(count) = toc;
         dataEePoses(count, :) = robot.getEEPos(jointReadings(1,:));
         count = count + 1;
