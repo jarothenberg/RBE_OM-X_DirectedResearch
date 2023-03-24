@@ -3,8 +3,17 @@
 classdef Robot
 
     properties
+        % Constants
+        PROTOCOL_VERSION;
+        PORT_NUM;
+        BAUDRATE;
+        COMM_SUCCESS;
+        COMM_TX_FAIL;
+
         % DX_XM430_W350 Servos
         motorsNum;
+        motorIDs;
+        gripperID;
         motors; % 4 Motors, joints 1-4
         gripper; % Gripper end-effector
 
@@ -12,14 +21,36 @@ classdef Robot
         mOtherDim; % Stores extraneous second link dimensions (cm)
         % Forward Kinematics variables  
         mDHTable; % DH Table for the arm. Thetas need to be added to the joint angles first
+
+        groupwrite_num;
+        groupread_num;
+
+        % Conversions
+        TICKS_PER_ROT;
+        TICKS_PER_DEG;
+        TICK_POS_OFFSET;
+        TICKS_PER_ANGVEL;
+        TICKS_PER_mA;
+
     end
 
     methods
         function self = Robot()
+            self.PROTOCOL_VERSION = 2.0;
+            self.BAUDRATE = 1000000;
+            self.COMM_SUCCESS = 0;
+            self.COMM_TX_FAIL = -1001;
             self.motorsNum = 4;
-            motorIDs = [11, 12, 13, 14];
-            gripperID = 15;
+            self.motorIDs = [11, 12, 13, 14];
+            self.gripperID = 15;
 
+            self.TICKS_PER_ROT = 4096;
+            self.TICKS_PER_DEG = self.TICKS_PER_ROT/360;
+            self.TICK_POS_OFFSET = self.TICKS_PER_ROT/2; % position value for a joint angle of 0 (2048 for this case)
+            self.TICKS_PER_ANGVEL = 1/(0.229 * 6); % 1 tick = 0.229 rev/min = 0.229*360/60 deg/s
+            self.TICKS_PER_mA = 1/2.69; % 1 tick = 2.69 mA
+
+            
             % Find serial port and connect to it
             try
                 devices = serialportlist();
@@ -27,14 +58,15 @@ classdef Robot
             catch exception
                 error("Failed to connect via serial, no devices found.")
             end
+            self.PORT_NUM = portHandler(deviceName);
             
             % Create array of motors
             for i=1:self.motorsNum
-                self.motors = [self.motors; DX_XM430_W350(motorIDs(i), deviceName)];
+                self.motors = [self.motors; DX_XM430_W350(self.motorIDs(i), deviceName)];
             end
 
             % Create Gripper and set operating mode/torque
-            self.gripper = DX_XM430_W350(gripperID, deviceName);
+            self.gripper = DX_XM430_W350(self.gripperID, deviceName);
             self.gripper.setOperatingMode('p');
             self.gripper.toggleTorque(true);
 
@@ -46,6 +78,9 @@ classdef Robot
             self.mOtherDim = [128, 24]; % (mm)
             % Forward Kinematics variables
             self.mDHTable = [0 77 0 -90; (asind(24/130) - 90) 0 130 0; (90 - asind(24/130)) 0 124 0; 0 0 126 0];
+
+            self.groupwrite_num = groupBulkWrite(self.PORT_NUM, self.PROTOCOL_VERSION);
+            self.groupread_num = groupBulkRead(self.PORT_NUM, self.PROTOCOL_VERSION);
         end
 
         % Returns the velocity for the end effector in x, y, z, roll, 
@@ -254,11 +289,10 @@ classdef Robot
         
         function readings = getJointsReadings(self)
             readings = zeros(3,4);
-            for i = 1:self.motorsNum
-                motor = self.motors(i);
-                readings(:,i) = motor.getJointReadings();
-                % fprintf('[ID:%03d] PresPos:%.9f\tPresVel:%.3f\tPresCur:%.3f\n', motor.ID, readings(1,i), readings(2,i), readings(3,i));
-            end
+            
+            readings(1, :) = (self.bulkReadWrite(4, self.gripper.CURR_POSITION) - self.TICK_POS_OFFSET) ./ self.TICKS_PER_DEG;
+            readings(2, :) = self.bulkReadWrite(4, self.gripper.CURR_VELOCITY) ./ self.TICKS_PER_ANGVEL;
+            readings(3, :) = self.bulkReadWrite(2, self.gripper.CURR_CURRENT) ./ self.TICKS_PER_mA;
         end
 
         % Returns the joint positions, velocities, and currents
@@ -314,5 +348,91 @@ classdef Robot
                 gripper.writePosition(55);
             end
         end
+
+        function result = bulkReadWrite(self, n, addr, msg)
+            if ~exist("msg", "var") % Bulk Read
+                result = zeros(1,4);
+                groupBulkReadClearParam(self.groupread_num);
+                for id = self.motorIDs
+                    % Add parameter storage for Dynamixel
+                    dxl_addparam_result = groupBulkReadAddParam(self.groupread_num, id, addr, n);
+                    if dxl_addparam_result ~= true
+                        fprintf('[ID:%03d ADDR:%d] groupBulkRead addparam failed\n', id, addr);
+                        return;
+                    end
+                end
+
+                % Bulkread present position and moving status
+                groupBulkReadTxRxPacket(self.groupread_num);
+                dxl_comm_result = getLastTxRxResult(self.PORT_NUM, self.PROTOCOL_VERSION);
+                if dxl_comm_result ~= 0
+                    fprintf('%s\n', getTxRxResult(self.PROTOCOL_VERSION, dxl_comm_result));
+                end
+
+                for i = 1:length(self.motorIDs)
+                    id = self.motorIDs(i);
+                    % Check if groupbulkread data of Dynamixel#1 is available
+                    dxl_getdata_result = groupBulkReadIsAvailable(self.groupread_num, id, addr, n);
+                    if dxl_getdata_result ~= true
+                        fprintf('[ID:%03d ADDR:%d] groupBulkRead getdata failed\n', id, addr);
+                        return;
+                    end
+                    
+                    % Get Dynamixels present position values
+                    readBits = groupBulkReadGetData(self.groupread_num, id, addr, n);
+                    % Printing
+                    result(i) = typecast(uint32(readBits), 'int32');
+                    % fprintf('[ID:%03d ADDR:%d] Pos: %d\n', id, addr(i), result(i));
+                end
+            else % Bulk Write
+                dxl_addparam_result = groupBulkWriteAddParam(self.groupwrite_num, id, addr, n, msg, n);
+                if dxl_addparam_result ~= true
+                    fprintf(stderr, '[ID:%03d] groupBulkWrite addparam failed', DXL1_ID);
+                    return;
+                end
+                % Bulkwrite LED values
+                groupBulkWriteTxPacket(groupwrite_num);
+                dxl_comm_result = getLastTxRxResult(port_num, PROTOCOL_VERSION);
+                if dxl_comm_result ~= COMM_SUCCESS
+                    fprintf('%s\n', getTxRxResult(PROTOCOL_VERSION, dxl_comm_result));
+                end
+            end
+        end
+
+
+
+% % Add parameter storage for Dynamixel#1 present position value
+% dxl_addparam_result = groupBulkReadAddParam(groupread_num, DXL1_ID, ADDR_PRO_PRESENT_POSITION, LEN_PRO_PRESENT_POSITION);
+% if dxl_addparam_result ~= true
+%     fprintf('[ID:%03d] groupBulkRead addparam failed', DXL1_ID);
+%     return;
+% end
+
+% groupBulkReadTxRxPacket(groupread_num);
+% dxl_comm_result = getLastTxRxResult(port_num, PROTOCOL_VERSION);
+% if dxl_comm_result ~= COMM_SUCCESS
+%     fprintf('%s\n', getTxRxResult(PROTOCOL_VERSION, dxl_comm_result));
+% end
+
+% % Check if groupbulkread data of Dynamixel#1 is available
+% dxl_getdata_result = groupBulkReadIsAvailable(groupread_num, DXL1_ID, ADDR_PRO_PRESENT_POSITION, LEN_PRO_PRESENT_POSITION);
+% if dxl_getdata_result ~= true
+%     fprintf('[ID:%03d] groupBulkRead getdata failed', DXL1_ID);
+%     return;
+% end
+
+% xl_addparam_result = groupBulkWriteAddParam(groupwrite_num, DXL1_ID, ADDR_PRO_LED_RED, LEN_PRO_LED_RED, dxl_led_value(index), LEN_PRO_LED_RED);
+% if dxl_addparam_result ~= true
+%   fprintf(stderr, '[ID:%03d] groupBulkWrite addparam failed', DXL1_ID);
+%   return;
+% end
+
+% groupBulkWriteTxPacket(groupwrite_num);
+% dxl_comm_result = getLastTxRxResult(port_num, PROTOCOL_VERSION);
+% if dxl_comm_result ~= COMM_SUCCESS
+%     fprintf('%s\n', getTxRxResult(PROTOCOL_VERSION, dxl_comm_result));
+% end
+
+% groupBulkWriteClearParam(groupwrite_num);
     end
 end

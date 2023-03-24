@@ -70,8 +70,8 @@ classdef DX_XM430_W350
             self.PORT_NUM = portHandler(self.DEVICENAME);
 
             % Initialize groupBulkRead/Write Struct
-            self.GROUPWRITE_NUM = groupBulkWrite(self.PORT_NUM, self.PROTOCOL_VERSION);
-            self.GROUPREAD_NUM = groupBulkRead(self.PORT_NUM, self.PROTOCOL_VERSION);
+            % self.GROUPWRITE_NUM = groupBulkWrite(self.PORT_NUM, self.PROTOCOL_VERSION);
+            % self.GROUPREAD_NUM = groupBulkRead(self.PORT_NUM, self.PROTOCOL_VERSION);
 
             % https://emanual.robotis.com/docs/en/dxl/x/xm430-w350/#control-table
             self.DRIVE_MODE = 10;
