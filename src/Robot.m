@@ -4,6 +4,7 @@ classdef Robot
 
     properties
         % Constants
+        LIB_NAME;
         PROTOCOL_VERSION;
         PORT_NUM;
         BAUDRATE;
@@ -32,11 +33,16 @@ classdef Robot
         TICKS_PER_ANGVEL;
         TICKS_PER_mA;
         MS_PER_S;
-
     end
 
     methods
         function self = Robot()
+            % Load Libraries
+            self.LIB_NAME = 'libdxl_x64_c'; % Linux 64
+            if ~libisloaded(self.LIB_NAME)
+                [notfound, warnings] = loadlibrary(self.LIB_NAME, 'dynamixel_sdk.h', 'addheader', 'port_handler.h', 'addheader', 'packet_handler.h', 'addheader', 'group_bulk_read.h', 'addheader', 'group_bulk_write.h');
+            end
+
             self.PROTOCOL_VERSION = 2.0;
             self.BAUDRATE = 1000000;
             self.COMM_SUCCESS = 0;
@@ -63,7 +69,7 @@ classdef Robot
 
             self.groupwrite_num = groupBulkWrite(self.PORT_NUM, self.PROTOCOL_VERSION);
             self.groupread_num = groupBulkRead(self.PORT_NUM, self.PROTOCOL_VERSION);
-            
+           
             % Create array of motors
             for i=1:self.motorsNum
                 self.motors = [self.motors; DX_XM430_W350(self.motorIDs(i), deviceName)];
@@ -333,7 +339,7 @@ classdef Robot
         end
 
         function writeVelocities(self, vels)
-            vels = round(vels .* self.TICKS_PER_ANGVEL)
+            vels = round(vels .* self.TICKS_PER_ANGVEL);
 
             self.bulkReadWrite(4, self.gripper.GOAL_VELOCITY, vels);
         end

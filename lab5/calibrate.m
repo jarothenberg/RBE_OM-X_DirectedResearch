@@ -1,6 +1,7 @@
 %% Configurations
 clear
 clc
+close all
 
 % Creates camera and performs camera calibration
 cam = Camera();
