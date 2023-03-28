@@ -10,7 +10,6 @@ time = data.time;
 joints = data.joints;
 traj = data.traj;
 endTime = time(end);
-robot = Robot();
 
 % pos, vel, acc subplots for desired trajectory
 anglesTime = time;

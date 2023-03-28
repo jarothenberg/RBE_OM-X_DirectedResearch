@@ -344,6 +344,11 @@ classdef Robot
             self.bulkReadWrite(4, self.gripper.GOAL_VELOCITY, vels);
         end
 
+        function writeCurrent(self, currents)
+            currentInTicks = round(currents .* self.TICKS_PER_mA);
+            self.bulkReadWrite(2, self.gripper.GOAL_CURRENT, currentInTicks);
+        end
+
         function writeMotorState(self, enable)
             self.bulkReadWrite(1, self.gripper.TORQUE_ENABLE, enable);
         end
