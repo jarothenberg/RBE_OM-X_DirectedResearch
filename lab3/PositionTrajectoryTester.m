@@ -2,7 +2,7 @@
 clear
 clc
 
-numPoints = 500;
+numPoints = 500; % 500
 travelTime = 3; % Defines the travel time
 robot = Robot(); % Creates robot object
 
@@ -37,18 +37,18 @@ count = 1;
 % Send to first vertex to start
 robot.writeJoints(trajectoriesAngles(1,2:end));
 pause(1);
-robot.setOperatingMode("p"); % v
+robot.setOperatingMode("v"); % p
 pause(1);
 tic; % Start timer
 % Go to each vertex in order
 for i = 2:height(trajectoriesAngles)
     % Velocity Control
-    % deltaDis = trajectoriesAngles(i,2:end) - trajectoriesAngles(i-1,2:end);
-    % vels = deltaDis./pauseTime;
-    % robot.writeVelocities(vels);
+    deltaDis = trajectoriesAngles(i,2:end) - trajectoriesAngles(i-1,2:end);
+    vels = deltaDis./pauseTime;
+    robot.writeVelocities(vels);
 
-    % Position Control
-    robot.writeJoints(trajectoriesAngles(i,2:end)); % Write joint values
+    % Position ControlColor
+%     robot.writeJoints(trajectoriesAngles(i,2:end)); % Write joint values
 
     % Collect a reading periodically until the setpoint is reached
     while toc < (i-1) * pauseTime
@@ -65,4 +65,4 @@ dataJoints = dataJoints(:,:,1:count-1);
 
 % Save data to a file
 data = struct("time", dataTime, "joints", dataJoints, "traj", trajectoriesAngles);
-save("pos_traj_test.mat", "data");
+save("pos_traj_veltest.mat", "data");

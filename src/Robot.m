@@ -126,6 +126,7 @@ classdef Robot
                 % Assigns the linear component and angular component to J
                 J(:,i) = [linear ; angulars(:,i)];
             end
+            J(5,:) = -J(5,:); % Changes the pitch due to our convention
         end
 
         % Given the 4 joint angles of each joint, return the 4 T matrices
