@@ -37,18 +37,18 @@ count = 1;
 % Send to first vertex to start
 robot.writeJoints(trajectoriesAngles(1,2:end));
 pause(1);
-robot.setOperatingMode("v");
+robot.setOperatingMode("p"); % v
 pause(1);
 tic; % Start timer
 % Go to each vertex in order
 for i = 2:height(trajectoriesAngles)
     % Velocity Control
-    deltaDis = trajectoriesAngles(i,2:end) - trajectoriesAngles(i-1,2:end);
-    vels = deltaDis./pauseTime;
-    robot.writeVelocities(vels);
+    % deltaDis = trajectoriesAngles(i,2:end) - trajectoriesAngles(i-1,2:end);
+    % vels = deltaDis./pauseTime;
+    % robot.writeVelocities(vels);
 
     % Position Control
-%     robot.writeJoints(trajectoriesAngles(i,2:end)); % Write joint values
+    robot.writeJoints(trajectoriesAngles(i,2:end)); % Write joint values
 
     % Collect a reading periodically until the setpoint is reached
     while toc < (i-1) * pauseTime
