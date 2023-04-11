@@ -78,11 +78,11 @@ classdef OM_X_arm
            
             % Create array of motors
             for i=1:self.motorsNum
-                self.motors = [self.motors; DX_XM430_W350(self.motorIDs(i), deviceName)];
+                self.motors = [self.motors; DX_XM430_W350(self.motorIDs(i), self.deviceName)];
             end
 
             % Create Gripper and set operating mode/torque
-            self.gripper = DX_XM430_W350(self.gripperID, deviceName);
+            self.gripper = DX_XM430_W350(self.gripperID, self.deviceName);
             self.gripper.setOperatingMode('p');
             self.gripper.toggleTorque(true);
         end
