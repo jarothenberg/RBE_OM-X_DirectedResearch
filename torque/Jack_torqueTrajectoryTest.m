@@ -2,7 +2,7 @@ clear;
 clc;
 
 travelTime = 10; % Defines the travel time
-updateTime = 0.01;
+updateTime = 0.05;
 robot = Robot(); % Creates robot object
 
 % Define setpoint poses, convert to angles for joint space trajectory
@@ -29,18 +29,18 @@ robot.writeMotorState(true); % Write position mode
 robot.setOperatingMode('p');
 robot.writeTime(0);
 robot.writeJoints(jointAngles(1,:));
-pause(travelTime);
-robot.setOperatingMode('c');
+pause(2.5);
+% robot.setOperatingMode('c');
 % robot.motors(2).setOperatingMode('c');
 % robot.motors(4).setOperatingMode('c');
 
 % PID constants
 kP = [4.55 20 23 8]
-kI = [0.12 1.75 0.6 0.35]
-kD = [25 50 25 5] 
+kI = [0.12 1 0.6 0.35]
+kD = [25 50 25 5]
 kImemory = 100000;
 
-data = zeros(100000, 9);
+data = zeros(100000, 17);
 count = 1;
 
 totalTic = tic;
@@ -62,24 +62,23 @@ for pathNum=1:(height(jointAngles)-1)
         forward = calcBaseCurr(pathNum, coeffArry, toc(startTime), updateTime);
         read = robot.getJointsReadings();
         curAngles = read(1,:);
+        curCurr = read(3,:);
         
         anglesErr = targetAngles - curAngles;
         errors(errorCount, :) = anglesErr;
         errorCount = mod((errorCount + 1),(kImemory-1))+1;
         errorSums = sum(errors);
         errorDer = anglesErr - preErr;
-        % robot.writeJoints(trajectoriesAngles(i,2:end)); % Write joint values
-        % cool current stuffkImemory
         
         currents = anglesErr.*kP + errorSums.*kI + errorDer.*kD;
         robot.writeJoints(targetAngles);
         robot.writeCurrent(currents);
         % disp(current);
-        data(count,:) = [toc(totalTic) targetAngles curAngles];
+        data(count,:) = [toc(totalTic) targetAngles curAngles currents curCurr];
         count = count + 1;
         
         preErr = anglesErr;
-
+%         measureTime = tic;
         % Collect a reading periodically until the setpoint is reached
         while toc(updateTic) < updateTime
             %disp(toc)
@@ -88,6 +87,7 @@ for pathNum=1:(height(jointAngles)-1)
             % dataEePoses(count, :) = robot.getEEPos(jointReadings(1,:));
             % count = count + 1;
         end
+%         disp(toc(measureTime))
     end
 end
 
@@ -97,7 +97,7 @@ robot.writeVelocities(0);
 data = data(1:count-1,:);
 time = data(:,1);
 maxTime = time(end);
-angleErr = data(:,2:5) - data(:,6:end);
+angleErr = data(:,2:5) - data(:,6:9);
 figure
 hold on
 plot(time, zeros(size(data(:,1))),"LineWidth", 3)
@@ -128,6 +128,21 @@ legend('J1 Ideal', 'J1 Actual', 'J2 Ideal', 'J2 Actual', 'J3 Ideal', 'J3 Actual'
 set(gca, "FontSize", 30)
 hold off
 
+colors = ["red","green","blue","magenta"];
+figure
+hold on
+for i=1:4
+    plot(time, data(:,i+9), "Color",colors(i),"LineStyle","-","LineWidth", 3);
+    plot(time, data(:,i+13), "Color",colors(i),"LineStyle",":","LineWidth", 3);
+end
+xlim([0 maxTime])
+title("Joint Current vs. Time")
+xlabel("Time (s)")
+ylabel("Current (mA)")
+legend('J1 PID Curr', 'J1 Act Curr', 'J2 PID Curr', 'J2 Act Curr', 'J3 PID Curr', 'J3 Act Curr', 'J4 PID Curr', 'J4 Act Curr');
+set(gca, "FontSize", 30)
+hold off
+
 function angles = calcAngles(pathNum, coeffMat, time)
     angles = zeros(1,4);
     for j=1:4
@@ -144,6 +159,7 @@ function baseCurr = calcBaseCurr(pathNum, coeffMat, time, timeDiff)
     vels = (endAngles - startAngles) ./ timeDiff;
     rpm = vels./6;
     torque = (rpm-44).*(3.01-0.07)./(6-44)+0.07;
+%     torque = -(rpm+44).*(3.01-0.07)./(6-44)+0.07;
     baseCurr=(1.8-0.18)./(3.01-0.07).*(torque-0.07)+0.18;
-    baseCurr = baseCurr.*sign(vels);
+    baseCurr = baseCurr.*sign(vels)*1000;
 end
