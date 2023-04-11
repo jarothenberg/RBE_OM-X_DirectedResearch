@@ -85,6 +85,10 @@ classdef OM_X_arm
             self.gripper = DX_XM430_W350(self.gripperID, self.deviceName);
             self.gripper.setOperatingMode('p');
             self.gripper.toggleTorque(true);
+
+            self.bulkReadWrite(1, self.gripper.TORQUE_ENABLE, 0);
+            self.bulkReadWrite(1, self.gripper.DRIVE_MODE, self.gripper.TIME_PROF);
+            self.bulkReadWrite(1, self.gripper.TORQUE_ENABLE, 1);
         end
 
         % Reads or Writes the message of length n from/to the desired address for all joints
