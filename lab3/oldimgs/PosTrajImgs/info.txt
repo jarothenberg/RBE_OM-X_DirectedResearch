@@ -1,4 +1,0 @@
-numPoints = 500; % number of waypoints
-travelTime = 3; % Time between each setpoint
-task space trajectory:
-eePoses = [25 -100 150 -60; 150 80 300 0; 250 -115 75 -45 ; 25 -100 150 -60]; % setpoints
