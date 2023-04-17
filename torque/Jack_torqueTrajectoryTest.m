@@ -2,7 +2,7 @@ clear;
 clc;
 
 travelTime = 10; % Defines the travel time
-updateTime = 0.05;
+updateTime = 0.0;
 robot = Robot(); % Creates robot object
 
 % Define setpoint poses, convert to angles for joint space trajectory
@@ -30,7 +30,7 @@ robot.setOperatingMode('p');
 robot.writeTime(0);
 robot.writeJoints(jointAngles(1,:));
 pause(2.5);
-% robot.setOperatingMode('c');
+robot.setOperatingMode('c');
 % robot.motors(2).setOperatingMode('c');
 % robot.motors(4).setOperatingMode('c');
 
