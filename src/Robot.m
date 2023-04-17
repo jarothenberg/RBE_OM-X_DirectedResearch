@@ -6,8 +6,9 @@ classdef Robot < OM_X_arm
     % Hopefully, you should only need what's in this class to accomplish everything.
     % But feel free to poke around!
     properties
-        mDim; % Stores the robot link dimentions (cm)
-        mOtherDim; % Stores extraneous second link dimensions (cm)
+        mDim; % Stores the robot link dimentions (mm)
+        mOtherDim; % Stores extraneous second link dimensions (mm)
+        mDHTable; % Stores the DH table constants (mm), (deg)
     end
 
     methods
@@ -23,6 +24,96 @@ classdef Robot < OM_X_arm
             % Robot Dimensions
             self.mDim = [77, 130, 124, 126]; % (mm)
             self.mOtherDim = [128, 24]; % (mm)
+            self.mDHTable = [0 self.mDim(1) 0 -90;...
+                            (asind(self.mOtherDim(2)/self.mOtherDim(1)) - 90) 0 self.mDim(2) 0;...
+                            (90 - asind(self.mOtherDim(2)/self.mOtherDim(1))) 0 self.mDim(3) 0;...
+                            0 0 self.mDim(4) 0];
+        end
+
+        %% Forward Kinematics Methods
+
+        % Given a row from the DH table, return the corresponding A matrix 
+        % (Homogeneous Transformation Matrix).
+        % row [1x4 double] - one row of the DH table to get the A matrix
+        function A = getDHRowMat(self, row)
+            theta = row(1);
+            d = row(2);
+            a = row(3);
+            alpha = row(4);
+
+            % Fill out A matrix based on DH conventions
+            A(1,:) = [cosd(theta) -sind(theta)*cosd(alpha) sind(theta)*sind(alpha) a*cosd(theta)];
+            A(2,:) = [sind(theta) cosd(theta)*cosd(alpha) -cosd(theta)*sind(alpha) a*sind(theta)];
+            A(3,:) = [0 sind(alpha) cosd(alpha) d];
+            A(4,:) = [0 0 0 1];
+        end
+
+        % Given the 4 joint angles of each joint, return the 4 A matrices
+        % jointAngles [1x4 double] - The joint angles of the robot arm in
+        % rad
+        % returns: 4x4x4 matrix: [A0 A1 A2 A3]
+        function AMat = getIntMat(self, jointAngles)
+            AMat = zeros(4,4,4);
+
+            % copy DH table and fill in with actual joint angles
+            dhTable = self.mDHTable;
+            dhTable(:,1) = dhTable(:,1) + jointAngles';
+
+            % Calculate each A matrix from corresponding row of DH table
+            for i = 1:4
+                AMat(:,:,i) = self.getDHRowMat(dhTable(i,:));
+            end
+        end
+
+        % Given the 4 joint angles of each joint, return the 4 T matrices
+        % (transform from the joint i to the base)
+        % jointAngles [1x4 double] - The joint angles of the robot arm in
+        % rad
+        % returns: 4x4x4 matrix: [T0_1 T0_2 T0_3 T0_4]
+        function TMat = getAccMat(self, jointAngles)
+            TMat = zeros(4,4,4);
+
+            % Get A matrices to multiply together
+            AMat = self.getIntMat(jointAngles);
+            
+            % T_1^0 = A_1
+            TMat(:,:,1) = AMat(:,:,1);
+            % post-multiply A matrices to get each T_i^0 matrix
+            for i = 2:4
+                TMat(:,:,i) = TMat(:,:,i-1)*AMat(:,:,i);
+            end
+        end
+
+        % Given the 4 joint angles of each joint, return T0_4
+        % (Transformation from end effector frame to base frame)
+        % jointAngles [1x4 double] - The joint angles of the robot arm in
+        % rad
+        % returns: 4x4 matrix: T0_4
+        function T = getFK(self, jointAngles)
+            % Get A matrices to multiply together
+            AMat = self.getIntMat(jointAngles);
+
+            % T_1^0 = A_1
+            T = AMat(:,:,1);
+            % post-multiply all A matrices in order to get in T_4^0
+            for i = 2:4
+                T = T * AMat(:,:,i);
+            end
+        end
+
+        % Return T0_4 based on the last read joint angles
+        % (Transformation from end effector frame to base frame)
+        % returns: 4x4 matrix: T0_4 using the last read joint angles
+        function T = getCurrentFK(self)
+            currentJoints = self.getJointsReadings();
+            T = self.getFK(currentJoints(1,:));
+        end
+
+        % Return T0_4 based on the last set goal joint angles
+        % (Transformation from end effector frame to base frame)
+        % returns: 4x4 matrix: T0_4 using the last set goal joint angles
+        function T = getGoalFK(self)
+            T = self.getFK(self.mJointGoal);
         end
 
         % Sends the joints to the desired angles
