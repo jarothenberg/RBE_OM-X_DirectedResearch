@@ -61,7 +61,8 @@ classdef Robot
             % Find serial port and connect to it
             try
                 devices = serialportlist();
-                deviceName = convertStringsToChars(devices(1));
+                ttyDevs = devices(contains(devices,"/dev/ttyUSB"));
+                deviceName = convertStringsToChars(ttyDevs(1));
             catch exception
                 error("Failed to connect via serial, no devices found.")
             end
