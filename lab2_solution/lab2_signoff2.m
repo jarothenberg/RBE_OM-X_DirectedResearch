@@ -1,3 +1,6 @@
+clear
+clc
+
 %% Setup robot
 robot = Robot(); % Creates robot object
 robot.writeMotorState(true); % Write position mode

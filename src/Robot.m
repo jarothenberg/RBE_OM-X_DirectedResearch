@@ -105,8 +105,9 @@ classdef Robot < OM_X_arm
         % (Transformation from end effector frame to base frame)
         % returns: 4x4 matrix: T0_4 using the last read joint angles
         function T = getCurrentFK(self)
-            currentJoints = self.getJointsReadings();
-            T = self.getFK(currentJoints(1,:));
+            read = self.getJointsReadings();
+            q = read(1,:);
+            T = self.getFK(q);
         end
 
         % Return T0_4 based on the last set goal joint angles

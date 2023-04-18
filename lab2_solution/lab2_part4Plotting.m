@@ -1,6 +1,6 @@
 clear
 clc
-load('lab2_part4_data.mat') % Read from collection script saved file
+load('lab2_part4Data.mat') % Read from collection script saved file
 
 % Calculate theoretical End Effector Position
 robot = Robot();
@@ -35,13 +35,13 @@ figure
 
 % Plot actual End Effector Position
 plot3(theoryPos(1,:),theoryPos(2,:),theoryPos(3,:), ...
-    "Color",'k',"Marker","o","MarkerFaceColor",'k')
+    "Color",'k',"Marker","o","MarkerFaceColor",'k',"MarkerSize",25)
 
 hold on
 
 % Plot Trial End Effector Positions
 for i = 1:5
-    plot3(T(1,i),T(2,i),T(3,i),"Color",colors(i),"Marker","o","MarkerFaceColor",colors(i))
+    plot3(T(1,i),T(2,i),T(3,i),"Color",colors(i),"Marker","o","MarkerFaceColor",colors(i),"MarkerSize",25)
 end
 
 % Plot Formatting
@@ -56,5 +56,7 @@ title("Robot End Effector Positions (wrt base frame)")
 xlabel('x [mm]')
 ylabel('y [mm]')
 zlabel('z [mm]')
+
+set(gca, "FontSize", 50)
 
 hold off

@@ -13,6 +13,8 @@ classdef Model
     methods
 
         % Constructor
+        % Note that our robot class defaults to turning the motor state to on,
+        % so this needs to be above in any script using Model to change this
         function self = Model() 
             self.robot = Robot();
         end
@@ -23,6 +25,10 @@ classdef Model
         % OpenManipulator-X arm in 3D
         % q [1x4 double] - the joint angles (rad) of the arm to be plotted
         function plotArm(self, q, plotFramesBool)
+            if ~exist("plotFramesBool","var")
+                plotFramesBool = true;
+            end
+
             % Get coordinates of each joint using translation from T matrices
             tMats = self.robot.getAccMat(q);
             points = reshape(tMats(1:3,4,:),3,4);
@@ -84,31 +90,31 @@ classdef Model
             zlim([0 500])
         end
         
-        % Given some number of joint configurations and the number of
-        % points to interpolate for each motion, simulate a motion between
-        % all of the setpoint joint configurations using plotArm
-        % qs - [nx4 double] - n setpoints to simulate motion for
-        % sequentially
-        % framesNum - int - Number of points to generate between each
-        % setpoint to simulate motion in the 3D plot
-        function dynamicPlot(self, qs, framesNum)
-            preQ = qs(1,:);
-            for k = 2:height(qs)
-                q = qs(k,:);
-                qLinspace = [linspace(preQ(1),q(1),framesNum); linspace(preQ(2),q(2),framesNum); linspace(preQ(3),q(3),framesNum); linspace(preQ(4),q(4),framesNum)]';
-                preQ = q;
-                for i = 1:framesNum
-                    for j = 1:4 
-                        qLinspace(i,j) = deg2rad(qLinspace(i,j));
-                    end  
-                end
+        % % Given some number of joint configurations and the number of
+        % % points to interpolate for each motion, simulate a motion between
+        % % all of the setpoint joint configurations using plotArm
+        % % qs - [nx4 double] - n setpoints to simulate motion for
+        % % sequentially
+        % % framesNum - int - Number of points to generate between each
+        % % setpoint to simulate motion in the 3D plot
+        % function dynamicPlot(self, qs, framesNum)
+        %     preQ = qs(1,:);
+        %     for k = 2:height(qs)
+        %         q = qs(k,:);
+        %         qLinspace = [linspace(preQ(1),q(1),framesNum); linspace(preQ(2),q(2),framesNum); linspace(preQ(3),q(3),framesNum); linspace(preQ(4),q(4),framesNum)]';
+        %         preQ = q;
+        %         for i = 1:framesNum
+        %             for j = 1:4 
+        %                 qLinspace(i,j) = deg2rad(qLinspace(i,j));
+        %             end  
+        %         end
     
-                for i = 1:framesNum
-                    plotArm(self, qLinspace(i,:), false);
-                    pause(0.033);
-                end
-            end
-        end
+        %         for i = 1:framesNum
+        %             plotArm(self, qLinspace(i,:), false);
+        %             pause(0.033);
+        %         end
+        %     end
+        % end
 
     end
 end

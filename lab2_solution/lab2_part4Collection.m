@@ -1,3 +1,6 @@
+clear
+clc
+
 %% Setup robot
 travelTime = 4; % Defines the travel time
 robot = Robot(); % Creates robot object
@@ -19,4 +22,4 @@ for i = 1:5
     T(:,:,i) = robot.getCurrentFK();
 end
 
-save('lab2_data.mat', "T") % Save T to file for plotting script to read from
+save('lab2_part4Data.mat', "T") % Save T to file for plotting script to read from

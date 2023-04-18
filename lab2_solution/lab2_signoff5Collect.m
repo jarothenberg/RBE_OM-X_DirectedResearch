@@ -1,8 +1,5 @@
-%% Configurationsclea
-
-% Shutdown configurations
-onCleanup(@shutdown); % Shutdown configurations
-rosinit; % Initializes ROS
+clear
+clc
 
 %% Setup robot
 travelTime = 5; % Defines the travel time
@@ -17,22 +14,19 @@ data = zeros(100000, 8);
 count = 1;   
 robot.writeJoints(jointAngles(1,:));
 pause(travelTime);
+
 tic; % Start timer
 for i = 2:4
     robot.writeJoints(jointAngles(i,:)); % Write joint values
     while toc < (i-1) * travelTime
-        jointReadings = robot.getJointsReadings();
-        data(count, :) = [toc jointReadings(1,:) robot.getEEPos(robot.degsToRads(jointReadings(1,:)))];
+        read = robot.getJointsReadings();
+        q = read(1,:);
+        T = robot.getFK(q); % Get T matrices
+        eePose = T(1:3,4)'; % Extract translation vector
+        data(count, :) = [toc q eePose];
         count = count + 1;
     end
 end
 data = data(1:count-1,:);
 saveData = struct('data', data, 'qs', jointAngles);
-save("lab2_part8_data.mat", "saveData");
-
-pause(1);
-% Shutsdown ROS
-function shutdown()
-    disp("Shutting Down...");
-        rosshutdown;
-end
+save("lab2_signoff5Data.mat", "saveData");
