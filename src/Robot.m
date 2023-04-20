@@ -130,6 +130,60 @@ classdef Robot
             J(5,:) = -J(5,:); % Changes the pitch due to our convention
         end
 
+        % Returns the Jacobian matrix calculated using the analytic method.
+        % This method is deprecated and not used in any code
+        % q [1x4 double] - The joint angles of the robot arm in degrees
+        % Returns: J [6x4 double] - Jacobian matrix
+        function J = getJacobianAnalytic(self, q)
+            % Sets angles from given q
+            t1 = q(1);
+            t2 = q(2);
+            t3 = q(3);
+            t4 = q(4);
+            % Gets values from forward kinematics to be used in partial
+            % derivatives
+            tau = atan2d(24,128);
+            re = 130*sind(t2+tau)+124*cosd(t2+t3)+126*cosd(t2+t3+t4);
+            % Partial derivates of x over t1, t2, t3, t4
+            x_t1 = -re*sind(t1);
+            x_t2 = cosd(t1)*(130*cosd(t2+tau)-124*sind(t2+t3)-126*sind(t2+t3+t4));
+            x_t3 = cosd(t1)*(-124*sind(t2+t3)-126*sind(t2+t3+t4));
+            x_t4 = cosd(t1)*-126*sind(t2+t3+t4);
+            % Partial derivates of y over t1, t2, t3, t4
+            y_t1 = re*cosd(t1);
+            y_t2 = sind(t1)*(130*cosd(t2+tau)-124*sind(t2+t3)-126*sind(t2+t3+t4));
+            y_t3 = sind(t1)*(-124*sind(t2+t3)-126*sind(t2+t3+t4));
+            y_t4 = sind(t1)*-126*sind(t2+t3+t4);
+            % Partial derivates of z over t1, t2, t3, t4
+            z_t1 = 0;
+            z_t2 = -130*sind(t2+tau)-124*cosd(t2+t3)-126*cosd(t2+t3+t4);
+            z_t3 = -124*cosd(t2+t3)-126*cosd(t2+t3+t4);
+            z_t4 = -126*cosd(t2+t3+t4);
+            % Partial derivates of phi over t1, t2, t3, t4
+            phi_t1 = 0;
+            phi_t2 = 0;
+            phi_t3 = 0;
+            phi_t4 = 0;
+            % Partial derivates of theta over t1, t2, t3, t4
+            theta_t1 = 0;
+            theta_t2 = -1;
+            theta_t3 = -1;
+            theta_t4 = -1;
+            % Partial derivates of psi over t1, t2, t3, t4
+            psi_t1 = 1;
+            psi_t2 = 0;
+            psi_t3 = 0;
+            psi_t4 = 0;
+            % Assigns all to Jacobian matrix
+            J = [x_t1, x_t2, x_t3, x_t4 ; ...
+                 y_t1, y_t2, y_t3, y_t4 ; ...
+                 z_t1, z_t2, z_t3, z_t4 ; ...
+                 phi_t1, phi_t2, phi_t3, phi_t4 ; ...
+                 theta_t1, theta_t2, theta_t3, theta_t4 ; ...
+                 psi_t1, psi_t2, psi_t3, psi_t4];
+            J(1:3,:) = J(1:3,:).*(pi/180);
+        end
+
         % Given the 4 joint angles of each joint, return the 4 T matrices
         % (transform from the joint i to the base)
         % jointAngles [1x4 double] - The joint angles of the robot arm in
