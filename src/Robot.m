@@ -21,6 +21,10 @@ classdef Robot < OM_X_arm
             self.writeMode('p');
             self.writeMotorState(true);
 
+            % Set the robot to move between positions with a 5 second profile
+            % change here or call writeTime in scripts to change
+            self.writeTime(5);
+
             % Robot Dimensions
             self.mDim = [77, 130, 124, 126]; % (mm)
             self.mOtherDim = [128, 24]; % (mm)
@@ -28,6 +32,92 @@ classdef Robot < OM_X_arm
                             (asind(self.mOtherDim(2)/self.mOtherDim(1)) - 90) 0 self.mDim(2) 0;...
                             (90 - asind(self.mOtherDim(2)/self.mOtherDim(1))) 0 self.mDim(3) 0;...
                             0 0 self.mDim(4) 0];
+        end
+
+        %% Inverse Kinematics Methods
+
+        % Returns the joint angles that will cause the end-effector to be
+        % at the desired pose (x,y,z,phi) based on the inverse kinematics
+        % of the arm. If the pose is not possible, this method will throw
+        % an error.
+        % pose [1x4 double] - The pose (x,y,z,phi) of the end-effector to
+        % calculate the corresponding joint angles for.
+        function q = getIK(self, pose)
+            % Define Links and givens from pose
+            L1 = self.mDim(1);
+            L2 = self.mDim(2);
+            L3 = self.mDim(3);
+            L4 = self.mDim(4);
+
+            xe = pose(1);
+            ye = pose(2);
+            ze = pose(3);
+            phi = pose(4); % pitch
+
+            % thetas array with each row corresponding to one of the 
+            % two possible solutions (elbow up vs down)
+            thetas = zeros([4,2]);
+            
+            thetas(1,:) = [atan2d(ye,xe) atan2d(ye,xe)];
+            re = sqrt(xe^2 + ye^2);
+
+            % Wrist position
+            rw = re - L4*cosd(phi);
+            zw = ze - L1 - L4*sind(phi);
+            dw = sqrt(rw^2 + zw^2);
+            
+            % Two values for Beta
+            cbeta = (L2^2 + L3^2 - dw^2)/(2*L2*L3);
+            sbeta = [sqrt(1-(cbeta)^2) -sqrt(1-(cbeta)^2)];
+            try
+                beta = [atan2d(sbeta(1),cbeta) atan2d(sbeta(2),cbeta)];
+            catch
+                error("End-Effector Pose Unreachable")
+            end
+            
+            % Constant value of psi
+            psi = atand(128/24);
+            
+            % 180 = psi + beta + theta3
+            % Two values for theta3
+            thetas(3,:) = 180 - psi - beta;
+            
+            % Two values for gamma, tau is a constant
+            gamma = asind(L3*sind(beta)/dw);
+            tau = asind(24*sind(psi)/128);
+
+            % One value for alpha
+            alpha = atan2d(zw,rw);
+            
+            % 90 = alpha + gamma + tau + theta2
+            % Two values for theta2
+            thetas(2,:) = 90 - tau - gamma - alpha;
+            
+            % phi = -theta2 - theta3 - theta4
+            % Two values for theta4
+            thetas(4,:) = -thetas(2,:) - thetas(3,:) - phi;
+
+            % Now check if each row in thetas is a valid solution based on
+            % the physical joint limits:
+            % Joint 1: (-180 180) (None)
+            % Joint 2: (-115 115)
+            % Joint 3: (-115 85)
+            % Joint 4: (-100 120)
+            limits = [-180 180;-120 120;-120 90;-105 125];
+
+            q = [];
+            for i = 1:2
+                valid = true;
+                for j = 1:4
+                    angle = thetas(j,i);
+                    if angle < limits(j,1) || angle > limits(j,2)
+                        valid = false;
+                    end
+                end
+                if (valid)
+                    q = [q; thetas(:,i)'];
+                end
+            end
         end
 
         %% Forward Kinematics Methods
@@ -110,11 +200,17 @@ classdef Robot < OM_X_arm
             T = self.getFK(q);
         end
 
-        % Return T0_4 based on the last set goal joint angles
-        % (Transformation from end effector frame to base frame)
-        % returns: 4x4 matrix: T0_4 using the last set goal joint angles
-        function T = getGoalFK(self)
-            T = self.getFK(self.mJointGoal);
+        % Return end-effector position (x,y,z in mm) based on the given
+        % joint angles
+        % returns: 1x3 array: Position wrt the base frame in mm in the
+        % x,y,and z direction
+        function eePos = getEEPos(self, q)
+            T = self.getFK(q); % Get T matrices
+            d = T(1:3,4)'; % Extract translation vector
+            
+            % TODO, extract roll pitch yaw from R
+
+            eePos = [d -(q(2) + q(3) + q(4))]; % Transpose to get EE coordinates
         end
 
         % Sends the joints to the desired angles
