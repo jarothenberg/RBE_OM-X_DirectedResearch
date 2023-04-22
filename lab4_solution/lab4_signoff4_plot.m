@@ -4,26 +4,29 @@ clc
 %% Plotting
 
 % Load Data
-load('lab3_signoff5_data.mat')
+load('lab4_signoff4_data.mat')
+% Sets variables from struct for easier plotting
 time = data.time;
-eePoses = data.eePose;
-angles = data.angles;
+eePoses = data.eePoses;
+% Final time
 endTime = time(end);
-
-% pos, vel, acc subplots
-anglesTime = angles(:,1);
-anglesEndTime = anglesTime(end);
-
+% List of derivative titles for graphs
 titles = ["Position", "Velocity", "Acceleration"];
 
+% Number of derivates to calculate and plot
 derivativeNum = 2;
+
+% Setting of generic x and y
 xData = time;
 yData = eePoses;
+
+% Creates figure
 figure
 % Loop to make as many subplots for position derivatives as desired
 for i=1:derivativeNum+1
     subplot(derivativeNum+1,1,i)
     hold on
+    % Plots x and y data for all y datasets
     for j=1:width(yData)
         plot(xData, yData(:,j),"LineWidth", 3)
     end
@@ -36,7 +39,7 @@ for i=1:derivativeNum+1
     set(gca, "FontSize", 50)
     grid on
     unitDivision = strcat('/s^', int2str(i-1));
-    legend(strcat('X (mm',unitDivision,')'),strcat('Y (mm',unitDivision,')'),strcat('Z (mm',unitDivision,')'),strcat('ϕ (degs',unitDivision,')'))
+    legend(strcat('X (mm',unitDivision,')'),strcat('Y (mm',unitDivision,')'),strcat('Z (mm',unitDivision,')'),strcat('ϕ (degs',unitDivision,')'), ,strcat(' (mm',unitDivision,')'))
     hold off
     
     % Calculate derivative of data (d/dt) for next loop

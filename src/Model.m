@@ -24,9 +24,18 @@ classdef Model
         % Given q (the joint angles of the robot), plots a diagram of the
         % OpenManipulator-X arm in 3D
         % q [1x4 double] - the joint angles (rad) of the arm to be plotted
-        function plotArm(self, q, plotFramesBool)
-            if ~exist("plotFramesBool","var")
+        % optional: plotFramesBool [logical] - whether to display the frames
+        % on each joint of the arm.
+        % optional: plotName [string] - Title for the plot to have.
+        function plotArm(self, q, pDot, plotFramesBool, plotName)
+
+            % Give parameters default values, making them optional
+            if ~exist("plotFramesBool", "var")
                 plotFramesBool = true;
+            end
+
+            if ~exist("plotName", "var")
+                plotName = "Robot Stick Model";
             end
 
             % Get coordinates of each joint using translation from T matrices
@@ -74,10 +83,29 @@ classdef Model
                 % Add legend for each arrow color
                 legend('Link', 'X', 'Y', 'Z')
             end
+
+            eeLinVels = pDot(1:3);
+            arrowMag = norm(eeLinVels);
+
+            % Calculate directions of the current axis
+            u = eeLinVels(1)/arrowMag;
+            v = eeLinVels(2)/arrowMag;
+            w = eeLinVels(3)/arrowMag;
+
+            c = 'r';
+            
+            % Plot arrows and update existing plot
+            h = quiver3(points(1,5),points(2,5),points(3,5), ...
+                u,v,w, ... 
+                arrowMag, c, 'LineWidth', 2);
+            set(h, 'XData', points(1,5), 'YData', points(2,5), 'ZData', points(3,5), ...
+                'udata', u,'vdata', v,'wdata', w, ...
+                'MaxHeadSize',5e2);
+
             hold off
 
             % Plot Formatting    
-            title('Robot Stick Model')
+            title(plotName)
 
             grid on
             
@@ -85,7 +113,7 @@ classdef Model
             ylabel('y [mm]')
             zlabel('z [mm]')
 
-            xlim([-100 400]) 
+            xlim([-400 400]) 
             ylim([-400 400])
             zlim([0 500])
         end

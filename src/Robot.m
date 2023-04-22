@@ -34,6 +34,46 @@ classdef Robot < OM_X_arm
                             0 0 self.mDim(4) 0];
         end
 
+        %% Jacobian and Velocity
+
+        % Returns the velocity for the end effector in x, y, z, roll, 
+        % pitch, and yaw, by multiplying the jacobian calculated with given
+        % joint angles and velocities
+        % q [1x4 double] - The joint angles of the robot arm in degrees
+        % qDot [1x4 double] - The joint velocities of the robot in deg/s
+        % Returns: pDot [1x6 double] - End effector velocities
+        function pDot = getForwardDiffKinematics(self, q, qDot)
+            % Creates jacobian from given q values
+            J = self.getJacobian(q);
+            % Finds end effector velocities
+            pDot = J*qDot';
+        end
+
+        % Returns the Jacobian matrix calculated using the geometric method
+        % q [1x4 double] - The joint angles of the robot arm in degrees
+        % Returns: J [6x4 double] - Jacobian matrix
+        function J = getJacobian(self, q)
+            % First get array of transformations of each joint to base
+            Ts = self.getAccMat(q);
+            % Initialize a 6x4 for Jacobian
+            J = zeros(6,length(q));
+            % Gets origin of end effector
+            eeOrigin = Ts(1:3,4,end);
+            % Creates an array of origins of each joint w.r.t. base frame
+            origins = [[0 0 0]' Ts(1:3,4,1) Ts(1:3,4,2) Ts(1:3,4,3)];
+            % Creates an array of z vectors from each joint
+            angulars = [[0 0 1]' Ts(1:3,3,1) Ts(1:3,3,2) Ts(1:3,3,3)];
+            % Loops through each joint for each column of J
+            for i=1:length(q)
+                % Assigns the linear component of the jacobian of the given
+                % joint to the cross product of the current joint's z axis
+                % and the difference of the end effector and current origin
+                linear = (pi/180)*cross(angulars(:,i), eeOrigin-origins(:,i));
+                % Assigns the linear component and angular component to J
+                J(:,i) = [linear ; angulars(:,i)];
+            end
+        end
+
         %% Inverse Kinematics Methods
 
         % Returns the joint angles that will cause the end-effector to be
