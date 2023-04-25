@@ -26,10 +26,10 @@ zlabel("z (mm)")
 title("EE Path in Space From Base Pose to Singular Config")
 set(gca, "FontSize", 50)
 xlim([250 400]) 
-mins = min(eePoses)
-maxs = max(eePoses)
+mins = min(eePoses);
+maxs = max(eePoses);
 xlim([mins(1) maxs(1)])
-ylim([mins(2) maxs(2)])
+ylim([-100 100])
 zlim([mins(3) maxs(3)])
 grid on
 % Creates second subplot

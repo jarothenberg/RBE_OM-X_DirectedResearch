@@ -39,7 +39,7 @@ for i=1:derivativeNum+1
     set(gca, "FontSize", 50)
     grid on
     unitDivision = strcat('/s^', int2str(i-1));
-    legend(strcat('X (mm',unitDivision,')'),strcat('Y (mm',unitDivision,')'),strcat('Z (mm',unitDivision,')'),strcat('ϕ (degs',unitDivision,')'), ,strcat(' (mm',unitDivision,')'))
+    legend(strcat('X (mm',unitDivision,')'),strcat('Y (mm',unitDivision,')'),strcat('Z (mm',unitDivision,')'),strcat('ϕ (degs',unitDivision,')'))
     hold off
     
     % Calculate derivative of data (d/dt) for next loop

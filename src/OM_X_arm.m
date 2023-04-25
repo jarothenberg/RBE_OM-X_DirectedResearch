@@ -67,7 +67,8 @@ classdef OM_X_arm
             % Find serial port and connect to it
             try
                 devices = serialportlist();
-                self.deviceName = convertStringsToChars(devices(1));
+                ttyDevs = devices(contains(devices,"/dev/ttyUSB"));
+                self.deviceName = convertStringsToChars(ttyDevs(1));
             catch exception
                 error("Failed to connect via serial, no devices found.")
             end

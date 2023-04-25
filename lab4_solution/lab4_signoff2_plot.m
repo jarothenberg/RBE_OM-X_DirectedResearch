@@ -4,7 +4,7 @@ clc
 %% Plotting
 
 % Load Data
-load('lab4_part5_data.mat')
+load('lab4_signoff2_data.mat')
 % Sets variables from struct for easier plotting
 time = data.time;
 angles = data.angles;
@@ -12,19 +12,9 @@ eeVels = data.eeVels;
 % Final time
 endTime = time(end);
 robot = Robot();
-model = Model();
-
-% Creates dynamic plot of robot motion with end effector velocity
-% Loops through all frames
-for i=1:height(time)-1
-    % Plots arm at given point with given end effector velocity
-    model.plotArm(angles(i,:),eeVels(i,:),false,"Dynamic Plot")
-    % Pause difference in time for accuracy
-    pause(time(i+1)-time(i))
-end
 
 % Initializes data array
-eePose = zeros(size(angles))
+eePose = zeros(size(angles));
 
 % Loops through all angles recorded
 for i=1:height(angles)
@@ -35,40 +25,25 @@ end
 % Creates figure
 figure
 % Assigns parts of data for clarity
-xLinVel = eeVels(:,1);
-yLinVel = eeVels(:,2);
-zLinVel = eeVels(:,3);
-xAngVel = eeVels(:,4);
-yAngVel = eeVels(:,5);
-zAngVel = eeVels(:,6);
+titles = ["Linear" "Angular"];
+ylabels = ["mm" "degs"];
+labels = ["Lin" "Ang"];
 % Creates first subplot
-subplot(3,1,1)
-hold on
-% Plots the linear velocites of x, y, and z over time
-plot(time, xLinVel,"LineWidth", 3);
-plot(time, yLinVel,"LineWidth", 3);
-plot(time, zLinVel,"LineWidth", 3);
-% Plot formatting
-title("Linear Velocity of ee vs. Time")
-ylabel("Velocity (mm/s)")
-xlabel("time (s)")
-legend("xLinVel", "yLinVel", "zLinVel")
-set(gca, "FontSize", 35)
-hold off
-% Creates second subplot
-subplot(3,1,2)
-hold on
-% Plots the angular velocities of x, y, and z over time
-plot(time, xAngVel,"LineWidth", 3);
-plot(time, yAngVel,"LineWidth", 3);
-plot(time, zAngVel,"LineWidth", 3);
-% Plot formatting
-title("Angular Velocity of ee vs. Time")
-ylabel("Velocity (degrees/s)")
-xlabel("time (s)")
-legend("xAngVel", "yAngVel", "zAngVel")
-set(gca, "FontSize", 35)
-hold off
+for i = 1:2
+    subplot(3,1,i)
+    hold on
+    % Plots the linear velocites of x, y, and z over time
+    for j = 1:3
+        plot(time, eeVels(:,j+3*(i-1)),"LineWidth", 3);
+    end
+    % Plot formatting
+    title(titles(i) + " Velocity of ee vs. Time")
+    ylabel("Velocity ("+ylabels(i)+"/s)")
+    xlabel("time (s)")
+    legend("x"+labels(i)+"Vel", "y"+labels(i)+"Vel", "z"+labels(i)+"Vel")
+    set(gca, "FontSize", 35)
+    hold off
+end
 % Creates third subplot
 subplot(3,1,3)
 % Calculates magnitude of end effector velocity

@@ -21,5 +21,4 @@ for i=1:height(eePoses)
     JforDet = J(1:3,1:3);
     % Calculates determinant of that Jacobian
     JDet = det(JforDet)
-    model.plot
 end
