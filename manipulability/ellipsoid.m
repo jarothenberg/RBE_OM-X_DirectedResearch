@@ -2,86 +2,21 @@ close all
 clear
 clc
 
-%% Based on Farzan
-
 robot = Robot();
 robot.writeMotorState(false);
 
-while true
-    read = robot.getJointsReadings();
-    q = read(1,:);
-    J = robot.getJacobian(q);
-    J = J(1:3,:);
-    [U D V] = svd(J);
-    sigmas = diag(D);
-    manipulability = prod(sigmas)
-end
-
-%% Based on https://modernrobotics.northwestern.edu/nu-gm-book-resource/5-4-manipulability/
-
-plotFramesBool = false;
-plotEEVelBool = false;
+plotFramesBool = true;
+plotEEVelBool = true;
 plotName = "ellipsoid model";
+warning('off','MATLAB:fplot:NotVectorized')
 
-figure
+figure('units','normalized','outerposition',[0 0 1 1])
 while true
     plotArmRealtimeEllipsoid(plotFramesBool, plotEEVelBool, plotName)
     pause(0)
 end
 
-figure
-while true
-    read = robot.getJointsReadings();
-    q = read(1,:);
-    J = robot.getJacobian(q);
 
-    [U D V] = svd(J);
-    sigmas = diag(D);
-    manipulability = prod(sigmas)   
-
-    Jang = J(1:3,:);
-    Jlin = J(4:6,:);
-    for i = 1:1 %2
-        curJ = J((i-1)*3+1:i*3,:);
-        A = curJ*curJ'; 
-        [V D] = eig(A)
-        eigenvalues = diag(D);
-        radii = sqrt(eigenvalues);
-        volume = 4/3*pi*prod(radii)
-        m1 = sqrt(max(eigenvalues)/min(eigenvalues));
-        m2 = max(eigenvalues)/min(eigenvalues);
-        m3 = sqrt(det(A));
-
-%         subplot(2,1,i)
-        a = radii(1);
-        b = radii(2);
-        c = radii(3);
-        funx = @(theta,phi) a*cos(theta).*cos(phi);
-        funy = @(theta,phi) b*cos(theta).*sin(phi);
-        funz = @(theta,phi) c*sin(theta);
-        
-        fs = fsurf(funx,funy,funz,[-pi/2 pi/2 -pi pi]);
-%         for j=1:3
-%             direction = [0 0 1];
-%             rotate(fs,direction,90)
-%         end
-        xlabel("x")
-        ylabel("y")
-        zlabel("z")
-        title(titles(i) + " volume: " + volume);
-        xlim([-10 10])
-        ylim([-10 10])
-        zlim([-10 10])  
-    end  
-    pause(0);
-end
-
-% Given q (the joint angles of the robot), plots a diagram of the
-% OpenManipulator-X arm in 3D
-% q [1x4 double] - the joint angles (rad) of the arm to be plotted
-% optional: plotFramesBool [logical] - whether to display the frames
-% on each joint of the arm.
-% optional: plotName [string] - Title for the plot to have.
 function plotArmRealtimeEllipsoid(plotFramesBool, plotEEVelBool, plotName)
     robot = Robot();
     robot.writeMotorState(false);
@@ -108,7 +43,7 @@ function plotArmRealtimeEllipsoid(plotFramesBool, plotEEVelBool, plotName)
     % Get coordinates of each joint using translation from T matrices
     tMats = robot.getAccMat(q);
     points = reshape(tMats(1:3,4,:),3,4);
-    points = [[0;0;0] points] % Add base frame origin
+    points = [[0;0;0] points]; % Add base frame origin
 
     % Plot Lines/Points
     p = plot3(points(1,:),points(2,:),points(3,:), '-o','Color','k','MarkerSize',10);
@@ -148,13 +83,12 @@ function plotArmRealtimeEllipsoid(plotFramesBool, plotEEVelBool, plotName)
         end
 
         % Add legend for each arrow color
-        legend('Link', 'X', 'Y', 'Z')
     end
 
     if plotEEVelBool
 
         eeLinVels = pDot(1:3);
-        arrowMag = norm(eeLinVels)
+        arrowMag = norm(eeLinVels);
     
         % Calculate directions of the current axis
         u = eeLinVels(1)/arrowMag;
@@ -181,10 +115,10 @@ function plotArmRealtimeEllipsoid(plotFramesBool, plotEEVelBool, plotName)
     for i = 1:1 %2
         curJ = J((i-1)*3+1:i*3,:);
         A = curJ*curJ'; 
-        [V D] = eig(A)
+        [V D] = eig(A);
         eigenvalues = diag(D);
         radii = sqrt(eigenvalues);
-        volume = 4/3*pi*prod(radii)
+        volume = 4/3*pi*prod(radii);
         m1 = sqrt(max(eigenvalues)/min(eigenvalues));
         m2 = max(eigenvalues)/min(eigenvalues);
         m3 = sqrt(det(A));
@@ -194,28 +128,27 @@ function plotArmRealtimeEllipsoid(plotFramesBool, plotEEVelBool, plotName)
         a = radii(1)*ellipsoidScale;
         b = radii(2)*ellipsoidScale;
         c = radii(3)*ellipsoidScale;
-        funx = @(theta,phi) a*cos(theta).*cos(phi) + points(1,end);
-        funy = @(theta,phi) b*cos(theta).*sin(phi) + points(2,end);
-        funz = @(theta,phi) c*sin(theta) + points(3,end);
+
+        funx = @(theta, phi) a*cos(theta).*cos(phi);
+        funy = @(theta, phi) b*cos(theta).*sin(phi);
+        funz = @(theta, phi) c*sin(theta);
+
+        fun = @(theta, phi) [funx(theta, phi) funy(theta, phi) funz(theta, phi)]';
+
+        funxPrime = @(theta, phi) V(:,1)'*fun(theta,phi) + points(1,end);
+        funyPrime = @(theta, phi) V(:,2)'*fun(theta,phi) + points(2,end);
+        funzPrime = @(theta, phi) V(:,3)'*fun(theta,phi) + points(3,end);
         
-        fs = fsurf(funx,funy,funz,[-pi/2 pi/2 -pi pi]);
-%         for j=1:3
-%             direction = [0 0 1];
-%             rotate(fs,direction,90)
-%         end
-        xlabel("x")
-        ylabel("y")
-        zlabel("z")
-        xlim([-10 10])
-        ylim([-10 10])
-        zlim([-10 10])  
+        funPrime = @(theta, phi) [funxPrime(theta, phi) ; funyPrime(theta, phi) ; funzPrime(theta, phi)];
+
+        fs = fsurf(funxPrime,funyPrime,funzPrime,[-pi/2 pi/2 -pi pi]);
     end  
 
     hold off
 
     % Plot Formatting    
-    title("ellipsoid model volume: " + volume);
-
+    title("ellipsoid model (volume: " + volume + ", manipulability: " + m3 + ")");
+    legend('Link', 'X', 'Y', 'Z')
     grid on
     
     xlabel('x [mm]')
