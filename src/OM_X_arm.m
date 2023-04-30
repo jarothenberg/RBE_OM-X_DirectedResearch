@@ -4,16 +4,7 @@
 % By Jack Rothenberg and Jatin Kohli
 
 classdef OM_X_arm
-
     properties
-        % Constants
-        LIB_NAME;
-        PROTOCOL_VERSION;
-        PORT_NUM;
-        BAUDRATE;
-        COMM_SUCCESS;
-        COMM_TX_FAIL;
-
         % DX_XM430_W350 Servos
         motorsNum;
         motorIDs;
@@ -22,17 +13,10 @@ classdef OM_X_arm
         gripper; % Gripper end-effector
 
         % Serial Communication variables
+        port_num;
         groupwrite_num;
         groupread_num;
         deviceName;
-
-        % Conversions
-        TICKS_PER_ROT;
-        TICKS_PER_DEG;
-        TICK_POS_OFFSET;
-        TICKS_PER_ANGVEL;
-        TICKS_PER_mA;
-        MS_PER_S;
     end
 
     methods
@@ -43,27 +27,14 @@ classdef OM_X_arm
         % controlling the motors individually on occasion.
         function self = OM_X_arm()
             % Load Libraries
-            self.LIB_NAME = 'libdxl_x64_c'; % Linux 64
-            if ~libisloaded(self.LIB_NAME)
-                [notfound, warnings] = loadlibrary(self.LIB_NAME, 'dynamixel_sdk.h', 'addheader', 'port_handler.h', 'addheader', 'packet_handler.h', 'addheader', 'group_bulk_read.h', 'addheader', 'group_bulk_write.h');
+            if ~libisloaded(DX_XM430_W350.LIB_NAME)
+                [notfound, warnings] = loadlibrary(DX_XM430_W350.LIB_NAME, 'dynamixel_sdk.h', 'addheader', 'port_handler.h', 'addheader', 'packet_handler.h', 'addheader', 'group_bulk_read.h', 'addheader', 'group_bulk_write.h');
             end
 
-            self.PROTOCOL_VERSION = 2.0;
-            self.BAUDRATE = 1000000;
-            self.COMM_SUCCESS = 0;
-            self.COMM_TX_FAIL = -1001;
             self.motorsNum = 4;
             self.motorIDs = [11, 12, 13, 14];
             self.gripperID = 15;
 
-            % conversions (see control table: https://emanual.robotis.com/docs/en/dxl/x/xm430-w350/#control-table-of-ram-area)
-            self.MS_PER_S = 1000;
-            self.TICKS_PER_ROT = 4096;
-            self.TICKS_PER_DEG = self.TICKS_PER_ROT/360;
-            self.TICK_POS_OFFSET = self.TICKS_PER_ROT/2; % position value for a joint angle of 0 (2048 for this case)
-            self.TICKS_PER_ANGVEL = 1/(0.229 * 6); % 1 tick = 0.229 rev/min = 0.229*360/60 deg/s
-            self.TICKS_PER_mA = 1/2.69; % 1 tick = 2.69 mA
-            
             % Find serial port and connect to it
             try
                 devices = serialportlist();
@@ -72,10 +43,26 @@ classdef OM_X_arm
             catch exception
                 error("Failed to connect via serial, no devices found.")
             end
-            self.PORT_NUM = portHandler(self.deviceName);
+            self.port_num = portHandler(self.deviceName);
 
-            self.groupwrite_num = groupBulkWrite(self.PORT_NUM, self.PROTOCOL_VERSION);
-            self.groupread_num = groupBulkRead(self.PORT_NUM, self.PROTOCOL_VERSION);
+            % Open port
+            if (~openPort(self.port_num))
+                unloadlibrary(DX_XM430_W350.LIB_NAME);
+                fprintf('Failed to open the port!\n');
+                input('Press any key to terminate...\n');
+                return;
+            end
+
+            % Set port baudrate
+            if (~setBaudRate(self.port_num, DX_XM430_W350.BAUDRATE))
+                unloadlibrary(DX_XM430_W350.LIB_NAME);
+                fprintf('Failed to change the baudrate!\n');
+                input('Press any key to terminate...\n');
+                return;
+            end
+
+            self.groupwrite_num = groupBulkWrite(self.port_num, DX_XM430_W350.PROTOCOL_VERSION);
+            self.groupread_num = groupBulkRead(self.port_num, DX_XM430_W350.PROTOCOL_VERSION);
            
             % Create array of motors
             for i=1:self.motorsNum
@@ -87,9 +74,11 @@ classdef OM_X_arm
             self.gripper.setOperatingMode('p');
             self.gripper.toggleTorque(true);
 
-            self.bulkReadWrite(1, self.gripper.TORQUE_ENABLE, 0);
-            self.bulkReadWrite(1, self.gripper.DRIVE_MODE, self.gripper.TIME_PROF);
-            self.bulkReadWrite(1, self.gripper.TORQUE_ENABLE, 1);
+            enable = 1;
+            disable = 0;
+            self.bulkReadWrite(DX_XM430_W350.TORQUE_ENABLE_LEN, DX_XM430_W350.TORQUE_ENABLE, enable);
+            self.bulkReadWrite(DX_XM430_W350.DRIVE_MODE_LEN, DX_XM430_W350.DRIVE_MODE, DX_XM430_W350.TIME_PROF);
+            self.bulkReadWrite(DX_XM430_W350.TORQUE_ENABLE_LEN, DX_XM430_W350.TORQUE_ENABLE, disable);
         end
 
         % Reads or Writes the message of length n from/to the desired address for all joints
@@ -116,9 +105,9 @@ classdef OM_X_arm
 
                 % Bulkread present position and moving status
                 groupBulkReadTxRxPacket(self.groupread_num);
-                dxl_comm_result = getLastTxRxResult(self.PORT_NUM, self.PROTOCOL_VERSION);
-                if dxl_comm_result ~= self.COMM_SUCCESS
-                    fprintf('%s\n', getTxRxResult(self.PROTOCOL_VERSION, dxl_comm_result));
+                dxl_comm_result = getLastTxRxResult(self.port_num, DX_XM430_W350.PROTOCOL_VERSION);
+                if dxl_comm_result ~= DX_XM430_W350.COMM_SUCCESS
+                    fprintf('%s\n', getTxRxResult(DX_XM430_W350.PROTOCOL_VERSION, dxl_comm_result));
                 end
 
                 for i = 1:self.motorsNum
@@ -176,9 +165,9 @@ classdef OM_X_arm
                 
                 % Bulkwrite
                 groupBulkWriteTxPacket(self.groupwrite_num);
-                dxl_comm_result = getLastTxRxResult(self.PORT_NUM, self.PROTOCOL_VERSION);
-                if dxl_comm_result ~= self.COMM_SUCCESS
-                    fprintf('%s\n', getTxRxResult(self.PROTOCOL_VERSION, dxl_comm_result));
+                dxl_comm_result = getLastTxRxResult(self.port_num, DX_XM430_W350.PROTOCOL_VERSION);
+                if dxl_comm_result ~= DX_XM430_W350.COMM_SUCCESS
+                    fprintf('%s\n', getTxRxResult(DX_XM430_W350.PROTOCOL_VERSION, dxl_comm_result));
                 end   
             end
         end

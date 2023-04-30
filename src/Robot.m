@@ -2,7 +2,7 @@
 % By Jack Rothenberg and Jatin Kohli
 
 classdef Robot < OM_X_arm
-    % Many properties are abstracted into OM_X_arm and DX_XM430_W350 classes
+    % Many properties are abstracted into OM_X_arm and DX_XM430_W350. classes
     % Hopefully, you should only need what's in this class to accomplish everything.
     % But feel free to poke around!
     properties
@@ -256,8 +256,8 @@ classdef Robot < OM_X_arm
         % Sends the joints to the desired angles
         % goals [1x4 double] - angles (degrees) for each of the joints to go to
         function writeJoints(self, goals)
-            goals = mod(round(goals .* self.TICKS_PER_DEG + self.TICK_POS_OFFSET), self.TICKS_PER_ROT);
-            self.bulkReadWrite(self.gripper.POS_LEN, self.gripper.GOAL_POSITION, goals);
+            goals = mod(round(goals .* DX_XM430_W350.TICKS_PER_DEG + DX_XM430_W350.TICK_POS_OFFSET), DX_XM430_W350.TICKS_PER_ROT);
+            self.bulkReadWrite(DX_XM430_W350.POS_LEN, DX_XM430_W350.GOAL_POSITION, goals);
         end
 
         % Creates a time based profile (trapezoidal) based on the desired times
@@ -271,11 +271,11 @@ classdef Robot < OM_X_arm
                 acc_time = time / 3;
             end
 
-            time_ms = time * self.MS_PER_S;
-            acc_time_ms = acc_time * self.MS_PER_S;
+            time_ms = time * DX_XM430_W350.MS_PER_S;
+            acc_time_ms = acc_time * DX_XM430_W350.MS_PER_S;
 
-            self.bulkReadWrite(4, self.gripper.PROF_ACC, acc_time_ms);
-            self.bulkReadWrite(4, self.gripper.PROF_VEL, time_ms);
+            self.bulkReadWrite(DX_XM430_W350.PROF_ACC_LEN, DX_XM430_W350.PROF_ACC, acc_time_ms);
+            self.bulkReadWrite(DX_XM430_W350.PROF_VEL_LEN, DX_XM430_W350.PROF_VEL, time_ms);
         end
         
         % Sets the gripper to be open or closed
@@ -292,14 +292,14 @@ classdef Robot < OM_X_arm
         % Sets position holding for the joints on or off
         % enable [boolean] - true to enable torque to hold last set position for all joints, false to disable
         function writeMotorState(self, enable)
-            self.bulkReadWrite(1, self.gripper.TORQUE_ENABLE, enable);
+            self.bulkReadWrite(DX_XM430_W350.TORQUE_ENABLE_LEN, DX_XM430_W350.TORQUE_ENABLE, enable);
         end
 
         % Supplies the joints with the desired currents
         % currents [1x4 double] - currents (mA) for each of the joints to be supplied
         function writeCurrents(self, currents)
-            currentInTicks = round(currents .* self.TICKS_PER_mA);
-            self.bulkReadWrite(self.gripper.CURR_LEN, self.gripper.GOAL_CURRENT, currentInTicks);
+            currentInTicks = round(currents .* DX_XM430_W350.TICKS_PER_mA);
+            self.bulkReadWrite(DX_XM430_W350.CURR_LEN, DX_XM430_W350.GOAL_CURRENT, currentInTicks);
         end
 
         % Change the operating mode for all joints:
@@ -315,23 +315,23 @@ classdef Robot < OM_X_arm
         function writeMode(self, mode)
             switch mode
                 case {'current', 'c'} 
-                    writeMode = self.gripper.CURR_CNTR_MD;
+                    writeMode = DX_XM430_W350.CURR_CNTR_MD;
                 case {'velocity', 'v'}
-                    writeMode = self.gripper.VEL_CNTR_MD;
+                    writeMode = DX_XM430_W350.VEL_CNTR_MD;
                 case {'position', 'p'}
-                    writeMode = self.gripper.POS_CNTR_MD;
+                    writeMode = DX_XM430_W350.POS_CNTR_MD;
                 case {'ext position', 'ep'} % Not useful normally
-                    writeMode = self.gripper.EXT_POS_CNTR_MD;
+                    writeMode = DX_XM430_W350.EXT_POS_CNTR_MD;
                 case {'curr position', 'cp'} % Not useful normally
-                    writeMode = self.gripper.CURR_POS_CNTR_MD;
+                    writeMode = DX_XM430_W350.CURR_POS_CNTR_MD;
                 case {'pwm voltage', 'pwm'} % Not useful normally
-                    writeMode = self.gripper.PWM_CNTR_MD;
+                    writeMode = DX_XM430_W350.PWM_CNTR_MD;
                 otherwise
-                    error("setOperatingMode input cannot be '%s'. See implementation in DX_XM430_W350 class.", mode)
+                    error("setOperatingMode input cannot be '%s'. See implementation in DX_XM430_W350. class.", mode)
             end
 
             self.writeMotorState(false);
-            self.bulkReadWrite(1, self.gripper.OPR_MODE, writeMode);
+            self.bulkReadWrite(DX_XM430_W350.OPR_MODE_LEN, DX_XM430_W350.OPR_MODE, writeMode);
             self.writeMotorState(true);
         end
 
@@ -341,16 +341,16 @@ classdef Robot < OM_X_arm
         function readings = getJointsReadings(self)
             readings = zeros(3,4);
             
-            readings(1, :) = (self.bulkReadWrite(self.gripper.POS_LEN, self.gripper.CURR_POSITION) - self.TICK_POS_OFFSET) ./ self.TICKS_PER_DEG;
-            readings(2, :) = self.bulkReadWrite(self.gripper.VEL_LEN, self.gripper.CURR_VELOCITY) ./ self.TICKS_PER_ANGVEL;
-            readings(3, :) = self.bulkReadWrite(self.gripper.CURR_LEN, self.gripper.CURR_CURRENT) ./ self.TICKS_PER_mA;
+            readings(1, :) = (self.bulkReadWrite(DX_XM430_W350.POS_LEN, DX_XM430_W350.CURR_POSITION) - DX_XM430_W350.TICK_POS_OFFSET) ./ DX_XM430_W350.TICKS_PER_DEG;
+            readings(2, :) = self.bulkReadWrite(DX_XM430_W350.VEL_LEN, DX_XM430_W350.CURR_VELOCITY) ./ DX_XM430_W350.TICKS_PER_ANGVEL;
+            readings(3, :) = self.bulkReadWrite(DX_XM430_W350.CURR_LEN, DX_XM430_W350.CURR_CURRENT) ./ DX_XM430_W350.TICKS_PER_mA;
         end
 
         % Sends the joints at the desired velocites
         % vels [1x4 double] - angular velocites (deg/s) for each of the joints to go at
         function writeVelocities(self, vels)
-            vels = round(vels .* self.TICKS_PER_ANGVEL);
-            self.bulkReadWrite(self.gripper.VEL_LEN, self.gripper.GOAL_VELOCITY, vels);
+            vels = round(vels .* DX_XM430_W350.TICKS_PER_ANGVEL);
+            self.bulkReadWrite(DX_XM430_W350.VEL_LEN, DX_XM430_W350.GOAL_VELOCITY, vels);
         end
     end % end methods
 end % end classrobot.writeGripper(true)
