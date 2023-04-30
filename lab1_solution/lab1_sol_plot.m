@@ -2,7 +2,7 @@
 figure
 
 % Read data from csv
-data = readmatrix("data.csv");
+data = readmatrix("data2.csv");
 timeData = data(:,1);
 travelTime = timeData(end);
 jointData = data(:,2:end);

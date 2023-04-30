@@ -28,4 +28,4 @@ end
 
 % remove unused space and write to csv
 data = data(1:dataNum,:);
-writematrix(data, "data.csv");
+writematrix(data, "data2.csv");
