@@ -21,9 +21,9 @@ for i = 2:4
     while toc < (i-1) * travelTime
         read = robot.getJointsReadings();
         q = read(1,:);
-        T = robot.getFK(q); % Get T matrices
-        eePose = T(1:3,4)'; % Extract translation vector
-        data(count, :) = [toc q eePose];
+        eePose = robot.getEEPos(q); % Extract translation vector
+        d = eePose(1:3);
+        data(count, :) = [toc q d];
         count = count + 1;
     end
 end

@@ -110,11 +110,15 @@ classdef Robot < OM_X_arm
             T = self.getFK(q);
         end
 
-        % Return T0_4 based on the last set goal joint angles
-        % (Transformation from end effector frame to base frame)
-        % returns: 4x4 matrix: T0_4 using the last set goal joint angles
-        function T = getGoalFK(self)
-            T = self.getFK(self.mJointGoal);
+        % Return end-effector position (x,y,z in mm) and orientation (pitch degrees) based on the given
+        % joint angles
+        % returns: 1x4 array: Position wrt the base frame in mm in the
+        % x,y,and z direction and pitch in degrees
+        function eePos = getEEPos(self, q)
+            T = self.getFK(q); % Get T matrices
+            d = T(1:3,4)'; % Extract translation vector
+
+            eePos = [d -(q(2) + q(3) + q(4))]; % Transpose to get EE coordinates
         end
 
         % Sends the joints to the desired angles
