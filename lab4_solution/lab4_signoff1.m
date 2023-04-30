@@ -2,7 +2,6 @@ clear
 clc
 
 robot = Robot(); % Creates robot object
-model = Model();
 
 % Angles which would cause the robot to reach overhead singularity
 overheadPos = [0 -atan2d(24,128) atan2d(24,128)-90 0];

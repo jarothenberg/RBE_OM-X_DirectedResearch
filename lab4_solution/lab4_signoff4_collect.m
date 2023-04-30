@@ -27,9 +27,9 @@ robot.writeMotorState(true);
 dataTime = zeros(2500, 1);
 dataEePos = zeros(2500, 4);
 
-tolerance = 5;
+tolerance = 1;
 count = 1;
-velocity = 250; %mm/s
+velocity = 50; %mm/s
 
 robot.writeJoints(angles(1,:));
 pause(travelTime+1);

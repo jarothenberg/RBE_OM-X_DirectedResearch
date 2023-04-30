@@ -5,7 +5,6 @@ travelTime = 5; % Defines the travel time
 robot = Robot(); % Creates robot object
 
 %% Setup robot
-robot.writeMotorState(true); % Write position mode
 robot.writeTime(travelTime);
 
 % Define setpoint poses
@@ -36,16 +35,17 @@ try
         read = robot.getJointsReadings();
         % Collect time data
         dataTime(count) = toc;
-        eePose = robot.getEEPos(read(1,:));
+        q = read(1,:);
+        eePose = robot.getEEPos(q);
         dataEePos(count,:) = eePose(:,1:3);
 
         % Calculate Jacobian matrix from joint readings
-        J = robot.getJacobian(read(1,:));
+        J = robot.getJacobian(q);
 
         % Calculate manipulability
         J = J(1:3,:); % Jv
-        [U D V] = svd(J);
-        manip = prod(diag(D));
+        A = J*J';
+        manip = sqrt(det(A));
 
         % Add Jacobian determinant to data list
         dataManip(count,:) = manip;
