@@ -24,9 +24,13 @@ classdef Model
         % Given q (the joint angles of the robot), plots a diagram of the
         % OpenManipulator-X arm in 3D
         % q [1x4 double] - the joint angles (rad) of the arm to be plotted
-        function plotArm(self, q, plotFramesBool)
+        function plotArm(self, q, plotFramesBool, plotName)
             if ~exist("plotFramesBool","var")
                 plotFramesBool = true;
+            end
+
+            if ~exist("plotName", "var")
+                plotName = "Robot Stick Model";
             end
 
             % Get coordinates of each joint using translation from T matrices
@@ -77,7 +81,7 @@ classdef Model
             hold off
 
             % Plot Formatting    
-            title('Robot Stick Model')
+            title(plotName)
 
             grid on
             
