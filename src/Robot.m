@@ -27,8 +27,6 @@ classdef Robot < OM_X_arm
             % Robot Dimensions
             self.mDim = [77, 130, 124, 126]; % (mm)
             self.mOtherDim = [128, 24]; % (mm)
-
-
         end
 
         % Sends the joints to the desired angles
