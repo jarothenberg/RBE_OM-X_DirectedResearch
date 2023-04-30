@@ -13,5 +13,5 @@ while true
     read = robot.getJointsReadings();
     q = read(1,:);
     model.plotArm(q, true);
-    pause(0.1)
+    pause(0)
 end

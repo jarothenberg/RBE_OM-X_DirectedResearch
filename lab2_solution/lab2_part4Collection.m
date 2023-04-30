@@ -5,7 +5,7 @@ clc
 travelTime = 4; % Defines the travel time
 robot = Robot(); % Creates robot object
 robot.writeTime(travelTime); % Write travel time
-robot.writeMotorState(true); % Write position mode
+
 %% Program 
 robot.writeJoints([0 0 0 0])
 pause(travelTime)

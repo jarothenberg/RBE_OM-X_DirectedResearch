@@ -3,7 +3,6 @@ clc
 
 %% Setup robot
 robot = Robot(); % Creates robot object
-robot.writeMotorState(true); % Write position mode
 travelTime = 10;
 robot.writeTime(travelTime)
 

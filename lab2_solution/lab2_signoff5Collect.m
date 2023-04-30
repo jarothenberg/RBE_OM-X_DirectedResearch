@@ -5,7 +5,7 @@ clc
 travelTime = 5; % Defines the travel time
 robot = Robot(); % Creates robot object
 robot.writeTime(travelTime); % Write travel time
-robot.writeMotorState(true); % Write position mode
+
 %% Program 
 
 jointAngles = [0 -45.0879 60.7324 51.9431 ; 0 9.82285 52.2070 -44.0332 ; 0 10.2832 -3.6035 -78.1348; 0 -45.0879 60.7324 51.9431];

@@ -6,13 +6,13 @@ travelTime = 10; % Defines the travel time
 robot = Robot(); % Creates robot object
 model = Model();
 robot.writeTime(travelTime); % Write travel time
-robot.writeMotorState(true); % Write position mode
+
 %% Program 
 
 jointAngles = [0 0 0 0 ; 45 -15 -60 30 ; -45 0 15 -45 ; 105 -75 60 0];
 fkArray = zeros(4, 4, 4);
 
-for i = 1:4
+for i = 1:height(jointAngles)
     disp(i)
     fkArray(:,:,i) = robot.getFK(jointAngles(i,:));
     robot.writeJoints(jointAngles(i,:)); % Write joint values
