@@ -95,8 +95,7 @@ classdef Camera < handle
             % 3. Detect checkerboard in the image
             [imagePoints, boardSize] = detectCheckerboardPoints(img, 'PartialDetections', false);
             % 4. Compute transformation
-            self.params.WorldPoints = self.params.WorldPoints(self.params.WorldPoints(:, 2) <= (boardSize(1)-1)*25, :);
-
+            self.params.WorldPoints = self.params.WorldPoints(self.params.WorldPoints(:, 2) <= (boardSize(1)-2)*25, :);
             worldPointSize = size(self.params.WorldPoints);
             imagePointSize = size(imagePoints);
             fprintf("World Points is %d x %d\n", worldPointSize(1), worldPointSize(2));
