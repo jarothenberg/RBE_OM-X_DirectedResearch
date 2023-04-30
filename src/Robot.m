@@ -283,9 +283,9 @@ classdef Robot < OM_X_arm
         % open [boolean] - true to set the gripper to open, false to close
         function writeGripper(self, open)
             if open
-                self.gripper.writePosition(-35);
+                self.gripper.writePosition(-45);
             else
-                self.gripper.writePosition(55);
+                self.gripper.writePosition(45);
             end
         end
 
@@ -353,4 +353,4 @@ classdef Robot < OM_X_arm
             self.bulkReadWrite(DX_XM430_W350.VEL_LEN, DX_XM430_W350.GOAL_VELOCITY, vels);
         end
     end % end methods
-end % end classrobot.writeGripper(true)
+end % end class
