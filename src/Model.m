@@ -18,30 +18,6 @@ classdef Model
         end
 
         %% Plotting Methods
-% 
-%         function plotEEVels(self, q, pDot, plotFramesBool, plotName)
-%             self.plotArm(q, plotFramesBool, plotName);
-%             color = 'r';
-%             tMats = self.robot.getAccMat(q);
-%             points = reshape(tMats(1:3,4,:),3,4);
-%             points = [[0;0;0] points]; % Add base frame origin
-%             % self.plotArm(q, plotFramesBool, plotName);
-%             eeLinVels = pDot(1:3);
-%             arrowMag = norm(eeLinVels)
-% 
-%             % Calculate directions of the current axis
-%             u = eeLinVels(1);
-%             v = eeLinVels(2);
-%             w = eeLinVels(3);
-%             
-%             % Plot arrows and update existing plot
-%             h = quiver3(points(1,4),points(2,4),points(3,4), ...
-%                 u,v,w, ... 
-%                 arrowMag*10000, color, 'LineWidth', 2);
-%             set(h, 'XData', points(1,4), 'YData', points(2,4), 'ZData', points(3,4), ...
-%                 'udata', u,'vdata', v,'wdata', w, ...
-%                 'MaxHeadSize',5e2);
-%         end
 
         % Given q (the joint angles of the robot), plots a diagram of the
         % OpenManipulator-X arm in 3D
@@ -107,7 +83,7 @@ classdef Model
             end
 
             eeLinVels = pDot(1:3);
-            arrowMag = norm(eeLinVels)
+            arrowMag = norm(eeLinVels);
 
             % Calculate directions of the current axis
             u = eeLinVels(1)/arrowMag;

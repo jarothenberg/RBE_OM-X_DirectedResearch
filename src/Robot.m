@@ -1,95 +1,40 @@
-% Robot class for OpenManipulator-X Robot
+% Skeleton Robot class for OpenManipulator-X Robot, for RBE 3001
+% By Jack Rothenberg and Jatin Kohli
 
-classdef Robot
-
+classdef Robot < OM_X_arm
+    % Many properties are abstracted into OM_X_arm and DX_XM430_W350. classes
+    % Hopefully, you should only need what's in this class to accomplish everything.
+    % But feel free to poke around!
     properties
-        % Constants
-        LIB_NAME;
-        PROTOCOL_VERSION;
-        PORT_NUM;
-        BAUDRATE;
-        COMM_SUCCESS;
-        COMM_TX_FAIL;
-
-        % DX_XM430_W350 Servos
-        motorsNum;
-        motorIDs;
-        gripperID;
-        motors; % 4 Motors, joints 1-4
-        gripper; % Gripper end-effector
-
-        mDim; % Stores the robot link dimentions (cm)
-        mOtherDim; % Stores extraneous second link dimensions (cm)
-        % Forward Kinematics variables  
-        mDHTable; % DH Table for the arm. Thetas need to be added to the joint angles first
-
-        groupwrite_num;
-        groupread_num;
-
-        % Conversions
-        TICKS_PER_ROT;
-        TICKS_PER_DEG;
-        TICK_POS_OFFSET;
-        TICKS_PER_ANGVEL;
-        TICKS_PER_mA;
-        MS_PER_S;
+        mDim; % Stores the robot link dimentions (mm)
+        mOtherDim; % Stores extraneous second link dimensions (mm)
+        mDHTable; % Stores the DH table constants (mm), (deg)
     end
 
     methods
+        % Creates constants and connects via serial
+        % Super class constructor called implicitly
+        % Add startup functionality here
         function self = Robot()
-            % Load Libraries
-            self.LIB_NAME = 'libdxl_x64_c'; % Linux 64
-            if ~libisloaded(self.LIB_NAME)
-                [notfound, warnings] = loadlibrary(self.LIB_NAME, 'dynamixel_sdk.h', 'addheader', 'port_handler.h', 'addheader', 'packet_handler.h', 'addheader', 'group_bulk_read.h', 'addheader', 'group_bulk_write.h');
-            end
-
-            self.PROTOCOL_VERSION = 2.0;
-            self.BAUDRATE = 1000000;
-            self.COMM_SUCCESS = 0;
-            self.COMM_TX_FAIL = -1001;
-            self.motorsNum = 4;
-            self.motorIDs = [11, 12, 13, 14];
-            self.gripperID = 15;
-
-            self.MS_PER_S = 1000;
-            self.TICKS_PER_ROT = 4096;
-            self.TICKS_PER_DEG = self.TICKS_PER_ROT/360;
-            self.TICK_POS_OFFSET = self.TICKS_PER_ROT/2; % position value for a joint angle of 0 (2048 for this case)
-            self.TICKS_PER_ANGVEL = 1/(0.229 * 6); % 1 tick = 0.229 rev/min = 0.229*360/60 deg/s
-            self.TICKS_PER_mA = 1/2.69; % 1 tick = 2.69 mA
-            
-            % Find serial port and connect to it
-            try
-                devices = serialportlist();
-                ttyDevs = devices(contains(devices,"/dev/ttyUSB"));
-                deviceName = convertStringsToChars(ttyDevs(1));
-            catch exception
-                error("Failed to connect via serial, no devices found.")
-            end
-            self.PORT_NUM = portHandler(deviceName);
-
-            self.groupwrite_num = groupBulkWrite(self.PORT_NUM, self.PROTOCOL_VERSION);
-            self.groupread_num = groupBulkRead(self.PORT_NUM, self.PROTOCOL_VERSION);
-           
-            % Create array of motors
-            for i=1:self.motorsNum
-                self.motors = [self.motors; DX_XM430_W350(self.motorIDs(i), deviceName)];
-            end
-
-            % Create Gripper and set operating mode/torque
-            self.gripper = DX_XM430_W350(self.gripperID, deviceName);
-            self.gripper.setOperatingMode('p');
-            self.gripper.toggleTorque(true);
-
-            self.setOperatingMode('p');
+            % Change robot to position mode with torque enabled by default
+            % Feel free to change this as desired
+            self.writeMode('p');
             self.writeMotorState(true);
+
+            % Set the robot to move between positions with a 5 second profile
+            % change here or call writeTime in scripts to change
+            self.writeTime(5);
 
             % Robot Dimensions
             self.mDim = [77, 130, 124, 126]; % (mm)
             self.mOtherDim = [128, 24]; % (mm)
-            % Forward Kinematics variables
-            self.mDHTable = [0 77 0 -90; (asind(24/130) - 90) 0 130 0; (90 - asind(24/130)) 0 124 0; 0 0 126 0];
+            self.mDHTable = [0 self.mDim(1) 0 -90;...
+                            (asind(self.mOtherDim(2)/self.mOtherDim(1)) - 90) 0 self.mDim(2) 0;...
+                            (90 - asind(self.mOtherDim(2)/self.mOtherDim(1))) 0 self.mDim(3) 0;...
+                            0 0 self.mDim(4) 0];
         end
+
+        %% Jacobian and Velocity
 
         % Returns the velocity for the end effector in x, y, z, roll, 
         % pitch, and yaw, by multiplying the jacobian calculated with given
@@ -127,81 +72,9 @@ classdef Robot
                 % Assigns the linear component and angular component to J
                 J(:,i) = [linear ; angulars(:,i)];
             end
-            J(5,:) = -J(5,:); % Changes the pitch due to our convention
         end
 
-        % Returns the Jacobian matrix calculated using the analytic method.
-        % This method is deprecated and not used in any code
-        % q [1x4 double] - The joint angles of the robot arm in degrees
-        % Returns: J [6x4 double] - Jacobian matrix
-        function J = getJacobianAnalytic(self, q)
-            % Sets angles from given q
-            t1 = q(1);
-            t2 = q(2);
-            t3 = q(3);
-            t4 = q(4);
-            % Gets values from forward kinematics to be used in partial
-            % derivatives
-            tau = atan2d(24,128);
-            re = 130*sind(t2+tau)+124*cosd(t2+t3)+126*cosd(t2+t3+t4);
-            % Partial derivates of x over t1, t2, t3, t4
-            x_t1 = -re*sind(t1);
-            x_t2 = cosd(t1)*(130*cosd(t2+tau)-124*sind(t2+t3)-126*sind(t2+t3+t4));
-            x_t3 = cosd(t1)*(-124*sind(t2+t3)-126*sind(t2+t3+t4));
-            x_t4 = cosd(t1)*-126*sind(t2+t3+t4);
-            % Partial derivates of y over t1, t2, t3, t4
-            y_t1 = re*cosd(t1);
-            y_t2 = sind(t1)*(130*cosd(t2+tau)-124*sind(t2+t3)-126*sind(t2+t3+t4));
-            y_t3 = sind(t1)*(-124*sind(t2+t3)-126*sind(t2+t3+t4));
-            y_t4 = sind(t1)*-126*sind(t2+t3+t4);
-            % Partial derivates of z over t1, t2, t3, t4
-            z_t1 = 0;
-            z_t2 = -130*sind(t2+tau)-124*cosd(t2+t3)-126*cosd(t2+t3+t4);
-            z_t3 = -124*cosd(t2+t3)-126*cosd(t2+t3+t4);
-            z_t4 = -126*cosd(t2+t3+t4);
-            % Partial derivates of phi over t1, t2, t3, t4
-            phi_t1 = 0;
-            phi_t2 = 0;
-            phi_t3 = 0;
-            phi_t4 = 0;
-            % Partial derivates of theta over t1, t2, t3, t4
-            theta_t1 = 0;
-            theta_t2 = -1;
-            theta_t3 = -1;
-            theta_t4 = -1;
-            % Partial derivates of psi over t1, t2, t3, t4
-            psi_t1 = 1;
-            psi_t2 = 0;
-            psi_t3 = 0;
-            psi_t4 = 0;
-            % Assigns all to Jacobian matrix
-            J = [x_t1, x_t2, x_t3, x_t4 ; ...
-                 y_t1, y_t2, y_t3, y_t4 ; ...
-                 z_t1, z_t2, z_t3, z_t4 ; ...
-                 phi_t1, phi_t2, phi_t3, phi_t4 ; ...
-                 theta_t1, theta_t2, theta_t3, theta_t4 ; ...
-                 psi_t1, psi_t2, psi_t3, psi_t4];
-            J(1:3,:) = J(1:3,:).*(pi/180);
-        end
-
-        % Given the 4 joint angles of each joint, return the 4 T matrices
-        % (transform from the joint i to the base)
-        % jointAngles [1x4 double] - The joint angles of the robot arm in
-        % rad
-        % returns: 4x4x4 matrix: [T0_1 T0_2 T0_3 T0_4]
-        function TMat = getAccMat(self, jointAngles)
-            TMat = zeros(4,4,4);
-
-            % Get A matrices to multiply together
-            AMat = self.getIntMat(jointAngles);
-            
-            % T_1^0 = A_1
-            TMat(:,:,1) = AMat(:,:,1);
-            % post-multiply A matrices to get each T_i^0 matrix
-            for i = 2:4
-                TMat(:,:,i) = TMat(:,:,i-1)*AMat(:,:,i);
-            end
-        end
+        %% Inverse Kinematics Methods
 
         % Returns the joint angles that will cause the end-effector to be
         % at the desired pose (x,y,z,phi) based on the inverse kinematics
@@ -307,14 +180,14 @@ classdef Robot
 
         % Given the 4 joint angles of each joint, return the 4 A matrices
         % jointAngles [1x4 double] - The joint angles of the robot arm in
-        % deg
+        % rad
         % returns: 4x4x4 matrix: [A0 A1 A2 A3]
         function AMat = getIntMat(self, jointAngles)
             AMat = zeros(4,4,4);
 
             % copy DH table and fill in with actual joint angles
             dhTable = self.mDHTable;
-            dhTable(:,1) = dhTable(:,1) + jointAngles'; 
+            dhTable(:,1) = dhTable(:,1) + jointAngles';
 
             % Calculate each A matrix from corresponding row of DH table
             for i = 1:4
@@ -322,10 +195,29 @@ classdef Robot
             end
         end
 
+        % Given the 4 joint angles of each joint, return the 4 T matrices
+        % (transform from the joint i to the base)
+        % jointAngles [1x4 double] - The joint angles of the robot arm in
+        % rad
+        % returns: 4x4x4 matrix: [T0_1 T0_2 T0_3 T0_4]
+        function TMat = getAccMat(self, jointAngles)
+            TMat = zeros(4,4,4);
+
+            % Get A matrices to multiply together
+            AMat = self.getIntMat(jointAngles);
+            
+            % T_1^0 = A_1
+            TMat(:,:,1) = AMat(:,:,1);
+            % post-multiply A matrices to get each T_i^0 matrix
+            for i = 2:4
+                TMat(:,:,i) = TMat(:,:,i-1)*AMat(:,:,i);
+            end
+        end
+
         % Given the 4 joint angles of each joint, return T0_4
         % (Transformation from end effector frame to base frame)
         % jointAngles [1x4 double] - The joint angles of the robot arm in
-        % deg
+        % rad
         % returns: 4x4 matrix: T0_4
         function T = getFK(self, jointAngles)
             % Get A matrices to multiply together
@@ -339,6 +231,15 @@ classdef Robot
             end
         end
 
+        % Return T0_4 based on the last read joint angles
+        % (Transformation from end effector frame to base frame)
+        % returns: 4x4 matrix: T0_4 using the last read joint angles
+        function T = getCurrentFK(self)
+            read = self.getJointsReadings();
+            q = read(1,:);
+            T = self.getFK(q);
+        end
+
         % Return end-effector position (x,y,z in mm) based on the given
         % joint angles
         % returns: 1x3 array: Position wrt the base frame in mm in the
@@ -346,169 +247,110 @@ classdef Robot
         function eePos = getEEPos(self, q)
             T = self.getFK(q); % Get T matrices
             d = T(1:3,4)'; % Extract translation vector
-
-            eePos = [d -(q(2)+q(3)+q(4))]; % Transpose to get EE coordinates
-        end
-        
-        function readings = getJointsReadings(self)
-            readings = zeros(3,4);
             
-            readings(1, :) = (self.bulkReadWrite(4, self.gripper.CURR_POSITION) - self.TICK_POS_OFFSET) ./ self.TICKS_PER_DEG;
-            readings(2, :) = self.bulkReadWrite(4, self.gripper.CURR_VELOCITY) ./ self.TICKS_PER_ANGVEL;
-            readings(3, :) = self.bulkReadWrite(2, self.gripper.CURR_CURRENT) ./ self.TICKS_PER_mA;
+            % TODO, extract roll pitch yaw from R
+
+            eePos = [d -(q(2) + q(3) + q(4))]; % Transpose to get EE coordinates
         end
 
-        % Returns the joint positions, velocities, and currents
-        % readings [3x4 double] - The joint positions, velocities,
-        % and efforts (rad, rad/s, mA)
-        function readings = getJointsReadingsRadians(self)
-            readings = self.getJointsReadings();
-            readings(1:2,:) = readings(1:2,:) .* pi/180;
-        end
-
-        function setOperatingMode(self, mode)
-            switch mode
-                case {'current', 'c'} 
-                    writeMode = self.gripper.CURR_CNTR_MD;
-                case {'velocity', 'v'}
-                    writeMode = self.gripper.VEL_CNTR_MD;
-                case {'position', 'p'}
-                    writeMode = self.gripper.POS_CNTR_MD;
-                case {'ext position', 'ep'}
-                    writeMode = self.gripper.EXT_POS_CNTR_MD;
-                case {'curr position', 'cp'}
-                    writeMode = self.gripper.CURR_POS_CNTR_MD;
-                case {'pwm voltage', 'pwm'}
-                    writeMode = self.gripper.PWM_CNTR_MD;
-                otherwise
-                    error("setOperatingMode input cannot be '%s'. See implementation in DX_XM430_W350 class.", mode)
-            end
-            self.writeMotorState(false);
-            self.bulkReadWrite(1, self.gripper.OPR_MODE, writeMode);
-            self.writeMotorState(true);
-        end
-
+        % Sends the joints to the desired angles
+        % goals [1x4 double] - angles (degrees) for each of the joints to go to
         function writeJoints(self, goals)
-            goals = mod(round(goals .* self.TICKS_PER_DEG + self.TICK_POS_OFFSET), self.TICKS_PER_ROT);
-            
-            self.bulkReadWrite(4, self.gripper.GOAL_POSITION, goals);
+            goals = mod(round(goals .* DX_XM430_W350.TICKS_PER_DEG + DX_XM430_W350.TICK_POS_OFFSET), DX_XM430_W350.TICKS_PER_ROT);
+            self.bulkReadWrite(DX_XM430_W350.POS_LEN, DX_XM430_W350.GOAL_POSITION, goals);
         end
 
-        function writeVelocities(self, vels)
-            vels = round(vels .* self.TICKS_PER_ANGVEL);
-
-            self.bulkReadWrite(4, self.gripper.GOAL_VELOCITY, vels);
-        end
-
-        function writeCurrent(self, currents)
-            currentInTicks = round(currents .* self.TICKS_PER_mA);
-            self.bulkReadWrite(2, self.gripper.GOAL_CURRENT, currentInTicks);
-        end
-
-        function writeMotorState(self, enable)
-            self.bulkReadWrite(1, self.gripper.TORQUE_ENABLE, enable);
-        end
-
+        % Creates a time based profile (trapezoidal) based on the desired times
+        % This will cause writePosition to take the desired number of
+        % seconds to reach the setpoint. Set time to 0 to disable this profile (be careful).
+        % time [double] - total profile time in s. If 0, the profile will be disabled (be extra careful).
+        % acc_time [double] - the total acceleration time (for ramp up and ramp down individually, not combined)
+        % acc_time is an optional parameter. It defaults to time/3.
         function writeTime(self, time, acc_time)
             if (~exist("acc_time", "var"))
                 acc_time = time / 3;
             end
 
-            time_ms = time * self.MS_PER_S;
-            acc_time_ms = acc_time * self.MS_PER_S;
+            time_ms = time * DX_XM430_W350.MS_PER_S;
+            acc_time_ms = acc_time * DX_XM430_W350.MS_PER_S;
 
-            self.bulkReadWrite(4, self.gripper.PROF_ACC, acc_time_ms);
-            self.bulkReadWrite(4, self.gripper.PROF_VEL, time_ms);
+            self.bulkReadWrite(DX_XM430_W350.PROF_ACC_LEN, DX_XM430_W350.PROF_ACC, acc_time_ms);
+            self.bulkReadWrite(DX_XM430_W350.PROF_VEL_LEN, DX_XM430_W350.PROF_VEL, time_ms);
         end
-
-        function writeGripper(self, isOpen)
-            gripper = self.gripper;
-            if isOpen
-                gripper.writePosition(-35);
+        
+        % Sets the gripper to be open or closed
+        % Feel free to change values for open and closed positions as desired (they are in degrees)
+        % open [boolean] - true to set the gripper to open, false to close
+        function writeGripper(self, open)
+            if open
+                self.gripper.writePosition(-45);
             else
-                gripper.writePosition(55);
+                self.gripper.writePosition(45);
             end
         end
 
-        function result = bulkReadWrite(self, n, addr, msgs)
-            if ~exist("msgs", "var") % Bulk Read
-                groupBulkReadClearParam(self.groupread_num);
-                
-                result = zeros(1,4);
-                for id = self.motorIDs
-                    % Add parameter storage for Dynamixel
-                    dxl_addparam_result = groupBulkReadAddParam(self.groupread_num, id, addr, n);
-                    if dxl_addparam_result ~= true
-                        fprintf('[ID:%03d ADDR:%d] groupBulkRead addparam failed\n', id, addr);
-                        return;
-                    end
-                end
-
-                % Bulkread present position and moving status
-                groupBulkReadTxRxPacket(self.groupread_num);
-                dxl_comm_result = getLastTxRxResult(self.PORT_NUM, self.PROTOCOL_VERSION);
-                if dxl_comm_result ~= self.COMM_SUCCESS
-                    fprintf('%s\n', getTxRxResult(self.PROTOCOL_VERSION, dxl_comm_result));
-                end
-
-                for i = 1:length(self.motorIDs)
-                    id = self.motorIDs(i);
-                    % Check if groupbulkread data of Dynamixel#1 is available
-                    dxl_getdata_result = groupBulkReadIsAvailable(self.groupread_num, id, addr, n);
-                    if dxl_getdata_result ~= true
-                        fprintf('[ID:%03d ADDR:%d] groupBulkRead getdata failed\n', id, addr);
-                        return;
-                    end
-                    
-                    % Get Dynamixels present position values
-                    readBits = groupBulkReadGetData(self.groupread_num, id, addr, n);
-                    % Printing
-                    switch (n)
-                        case {1}
-                            result(i) = typecast(uint8(readBits), 'int8');
-                        case {2}
-                            result(i) = typecast(uint16(readBits), 'int16');
-                        case {4}
-                            result(i) = typecast(uint32(readBits), 'int32');
-                        otherwise
-                            error("'%s' is not a valid number of bytes to read.\n", n);
-                    end
-                end
-                
-            else % Bulk Write
-                switch(n)
-                    case {1}
-                        msgs = typecast(int8(msgs), 'uint8');
-                    case {2}
-                        msgs = typecast(int16(msgs), 'uint16');
-                    case {4}
-                        msgs = typecast(int32(msgs), 'uint32');
-                    otherwise
-                        error("'%s' is not a valid number of bytes to write.\n", n);
-                end
-
-                if length(msgs) == 1
-                    msgs = repelem(msgs, 4);
-                end
-
-                groupBulkWriteClearParam(self.groupwrite_num);
-                for i = 1:length(self.motorIDs)
-                    id = self.motorIDs(i);
-                    dxl_addparam_result = groupBulkWriteAddParam(self.groupwrite_num, id, addr, n, msgs(i), n);
-                    if dxl_addparam_result ~= true
-                        fprintf('[ID:%03d ADDR:%d MSG:%d] groupBulkWrite addparam failed\n', id, addr, msgs(i));
-                        return;
-                    end
-                end
-                
-                % Bulkwrite
-                groupBulkWriteTxPacket(self.groupwrite_num);
-                dxl_comm_result = getLastTxRxResult(self.PORT_NUM, self.PROTOCOL_VERSION);
-                if dxl_comm_result ~= self.COMM_SUCCESS
-                    fprintf('%s\n', getTxRxResult(self.PROTOCOL_VERSION, dxl_comm_result));
-                end
-                
-            end
+        % Sets position holding for the joints on or off
+        % enable [boolean] - true to enable torque to hold last set position for all joints, false to disable
+        function writeMotorState(self, enable)
+            self.bulkReadWrite(DX_XM430_W350.TORQUE_ENABLE_LEN, DX_XM430_W350.TORQUE_ENABLE, enable);
         end
-    end
-end
+
+        % Supplies the joints with the desired currents
+        % currents [1x4 double] - currents (mA) for each of the joints to be supplied
+        function writeCurrents(self, currents)
+            currentInTicks = round(currents .* DX_XM430_W350.TICKS_PER_mA);
+            self.bulkReadWrite(DX_XM430_W350.CURR_LEN, DX_XM430_W350.GOAL_CURRENT, currentInTicks);
+        end
+
+        % Change the operating mode for all joints:
+        % https://emanual.robotis.com/docs/en/dxl/x/xm430-w350/#operating-mode11
+        % mode [string] - new operating mode for all joints
+        % "current": Current Control Mode (writeCurrent)
+        % "velocity": Velocity Control Mode (writeVelocity)
+        % "position": Position Control Mode (writePosition)
+        % Other provided but not relevant/useful modes:
+        % "ext position": Extended Position Control Mode
+        % "curr position": Current-based Position Control Mode
+        % "pwm voltage": PWM Control Mode
+        function writeMode(self, mode)
+            switch mode
+                case {'current', 'c'} 
+                    writeMode = DX_XM430_W350.CURR_CNTR_MD;
+                case {'velocity', 'v'}
+                    writeMode = DX_XM430_W350.VEL_CNTR_MD;
+                case {'position', 'p'}
+                    writeMode = DX_XM430_W350.POS_CNTR_MD;
+                case {'ext position', 'ep'} % Not useful normally
+                    writeMode = DX_XM430_W350.EXT_POS_CNTR_MD;
+                case {'curr position', 'cp'} % Not useful normally
+                    writeMode = DX_XM430_W350.CURR_POS_CNTR_MD;
+                case {'pwm voltage', 'pwm'} % Not useful normally
+                    writeMode = DX_XM430_W350.PWM_CNTR_MD;
+                otherwise
+                    error("setOperatingMode input cannot be '%s'. See implementation in DX_XM430_W350. class.", mode)
+            end
+
+            self.writeMotorState(false);
+            self.bulkReadWrite(DX_XM430_W350.OPR_MODE_LEN, DX_XM430_W350.OPR_MODE, writeMode);
+            self.writeMotorState(true);
+        end
+
+        % Gets the current joint positions, velocities, and currents
+        % readings [3x4 double] - The joints' positions, velocities,
+        % and efforts (deg, deg/s, mA)
+        function readings = getJointsReadings(self)
+            readings = zeros(3,4);
+            
+            readings(1, :) = (self.bulkReadWrite(DX_XM430_W350.POS_LEN, DX_XM430_W350.CURR_POSITION) - DX_XM430_W350.TICK_POS_OFFSET) ./ DX_XM430_W350.TICKS_PER_DEG;
+            readings(2, :) = self.bulkReadWrite(DX_XM430_W350.VEL_LEN, DX_XM430_W350.CURR_VELOCITY) ./ DX_XM430_W350.TICKS_PER_ANGVEL;
+            readings(3, :) = self.bulkReadWrite(DX_XM430_W350.CURR_LEN, DX_XM430_W350.CURR_CURRENT) ./ DX_XM430_W350.TICKS_PER_mA;
+        end
+
+        % Sends the joints at the desired velocites
+        % vels [1x4 double] - angular velocites (deg/s) for each of the joints to go at
+        function writeVelocities(self, vels)
+            vels = round(vels .* DX_XM430_W350.TICKS_PER_ANGVEL);
+            self.bulkReadWrite(DX_XM430_W350.VEL_LEN, DX_XM430_W350.GOAL_VELOCITY, vels);
+        end
+    end % end methods
+end % end class

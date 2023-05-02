@@ -123,6 +123,8 @@ function plotArmRealtimeEllipsoid(plotFramesBool, plotEEVelBool, plotName)
         m2 = max(eigenvalues)/min(eigenvalues);
         m3 = sqrt(det(A));
 
+        K = volume / m3; % constant: 4pi/3 for 3D ellipsoid
+
 %         subplot(2,1,i)
         ellipsoidScale = 10;
         a = radii(1)*ellipsoidScale;
@@ -147,7 +149,7 @@ function plotArmRealtimeEllipsoid(plotFramesBool, plotEEVelBool, plotName)
     hold off
 
     % Plot Formatting    
-    title("ellipsoid model (volume: " + volume + ", manipulability: " + m3 + ")");
+    title("ellipsoid model (volume: " + volume + ", manipulability: " + m3 + ", K: " + K + ")");
     legend('Link', 'X', 'Y', 'Z')
     grid on
     
