@@ -94,7 +94,7 @@ classdef Camera < handle
                 % Calculates the center of the given color circle in pixels
                 colorCenter = ips(2*4*(i-1)+4,:);
                 % Generates x and y coords of a circle parametrically
-                theta = linspace(0,2*pi,10000);
+                theta = linspace(0,2*pi,1000000);
                 coordsX = 25*cos(theta)+colorCenter(1);
                 coordsY = 25*sin(theta)+colorCenter(2);
                 % Creates a circular mask using the coordinates calculated
