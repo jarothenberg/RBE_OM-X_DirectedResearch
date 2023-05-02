@@ -10,7 +10,6 @@ time = data.time;
 joints = data.joints;
 traj = data.traj;
 endTime = time(end);
-robot = Robot();
 
 for i = 1:length(joints)
     vels = robot.getForwardDiffKinematics(squeeze(joints(1,:,i)), squeeze(joints(2,:,i)))';
