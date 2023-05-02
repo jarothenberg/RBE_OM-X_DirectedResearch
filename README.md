@@ -4,6 +4,8 @@ Jatin Kohli (jpkohli@wpi.edu)
 
 We experimented with the OpenManipulator-X arm to test new features for future versions of RBE 3001. We also modified the existing lab documents and provided solution code for use with the OM-X arm. Releases have been made for the RBE 3001 starter code and solution files for each lab.
 
+Folder with updated lab docs: https://drive.google.com/drive/folders/1HIRXBjA3lb7s0H34iyEDd1wt5R5lcJxh
+
 ## Branches
 - master: Experiment Code
   - torque: Script that uses PID based on position error and current control to follow a task space trajectory. The constants were found experimentally and motion plots for several sets of constants are provided.
